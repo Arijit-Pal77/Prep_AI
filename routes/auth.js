@@ -56,7 +56,7 @@ router.post("/signup", async (req, res) => {
 
         res.status(201).json({ message: "User registered successfully." });
     } catch (err) {
-        console.error("Signup error:", err);
+        console.error("DB ERROR during signup:", err);
         res.status(500).json({ error: "Server error during registration." });
     }
 });
@@ -96,7 +96,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
         res.json({ message: "Login successful.", token });
     } catch (err) {
-        console.error("Login error:", err);
+        console.error("DB ERROR during login:", err);
         res.status(500).json({ error: "Server error during login." });
     }
 });

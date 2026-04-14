@@ -21,9 +21,13 @@ Improvement:
 Ideal Answer:
 `;
 
-  const result = await callGemini(prompt, process.env.API_KEY);
-
-  res.json({ result });
+  try {
+    const result = await callGemini(prompt, process.env.API_KEY);
+    res.json({ result });
+  } catch (error) {
+    console.error("AI EVALUATION ERROR:", error);
+    res.status(500).json({ error: "❌ Evaluation error occurred." });
+  }
 });
 
 export default router;

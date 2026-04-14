@@ -54,8 +54,8 @@ Rules:
         res.json({ result });
 
     } catch (error) {
-        console.error("Interview error:", error);
-        res.status(500).json({ result: "❌ Interview error" });
+        console.error("AI INTERVIEW ERROR:", error);
+        res.status(500).json({ result: "❌ Interview error occurred. Please try again." });
     }
 });
 
