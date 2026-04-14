@@ -303,6 +303,9 @@
         </p>
       </div>
     </div>
+    
+    <!-- 🏛️ Shared History Box -->
+    <div id="historyBox" class="hidden glass-panel rounded-2xl p-8 obsidian-shadow fade-up border-primary/30"></div>
 
     <!-- ══════════════════════════════════════
          PANEL: Answer Evaluator
@@ -377,9 +380,7 @@
             <div id="eval-result" class="flex-1 rounded-xl bg-slate-950/30 border border-white/8 p-5 text-sm leading-relaxed text-slate-500 overflow-y-auto mb-4">
               Submit your answer to see the AI analysis results here.
             </div>
-            
-            <!-- History box (shared) -->
-            <div id="historyBox" class="hidden rounded-xl bg-slate-950/50 border border-primary/20 p-5 obsidian-shadow fade-up"></div>
+            </div>
           </div>
         </div>
 
@@ -763,7 +764,8 @@
   }
 
   function esc(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function setLoading(id, msg) {
@@ -836,6 +838,7 @@
       
       scores.forEach((s, i) => {
         const date = new Date(s.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+        const feedbackPreview = s.feedback ? s.feedback.split('\n')[0] : 'View detailed feedback...';
         html += `
           <div class="history-item group bg-slate-900/40 hover:bg-slate-800/40 p-4 rounded-xl border border-white/5 hover:border-primary/30 transition-all cursor-pointer">
             <div class="flex items-center justify-between mb-2">
@@ -845,7 +848,7 @@
               </div>
             </div>
             <p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
-              ${esc(s.feedback.split('\n')[0] || 'View detailed feedback...')}
+              ${esc(feedbackPreview)}
             </p>
           </div>`;
       });
@@ -854,6 +857,7 @@
           Clear History
         </button>`;
       box.innerHTML = html;
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       box.innerHTML = `<div class="text-rose-400 text-xs font-bold uppercase p-4 text-center">Failed to synchronize history</div>`;
     }
