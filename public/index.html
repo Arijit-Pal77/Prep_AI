@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<meta name="description" content="Prep AI – Your AI-powered placement copilot. Evaluate answers and practice mock interviews with real-time Gemini AI feedback.">
+<title>Prep AI – AI Placement Copilot</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #05050a; color: #e3e0f8; overflow-x: hidden; }
+  .font-headline { font-family: 'Space Grotesk', sans-serif; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+  /* ── Galaxy Background ── */
+  #galaxy-bg {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1; background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%); overflow: hidden;
+  }
+  .star {
+    position: absolute; background: white; border-radius: 50%; opacity: 0.5;
+    animation: moveStar linear infinite;
+  }
+  @keyframes moveStar { from { transform: translateY(0); } to { transform: translateY(-2000px); } }
+
+  /* ── Glass & Shadows ── */
+  .glass-panel {
+    background: rgba(18, 18, 34, 0.45);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.09);
+  }
+  .obsidian-shadow { box-shadow: 0 0 60px -10px rgba(124,111,247,0.18); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(139,128,255,0.3); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(139,128,255,0.6); }
+
+  /* ── Nebula ── */
+  .nebula { position: absolute; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.15; pointer-events: none; }
+
+  /* ── Mode panels ── */
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
+  /* ── Result sections ── */
+  .res-section { border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 14px; margin-bottom: 14px; }
+  .res-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .res-key { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px; }
+  .res-val { font-size: 14px; line-height: 1.75; color: #e3e0f8; white-space: pre-wrap; }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(139,128,255,0.2); border-top-color: #c6c0ff;
+    border-radius: 50%; animation: spin 0.65s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 28px; right: 24px;
+    background: rgba(18,18,34,0.95); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+    padding: 12px 20px; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.35s cubic-bezier(.34,1.56,.64,1); z-index: 9999;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: rgba(52,211,153,0.4); }
+  #toast.error   { border-color: rgba(248,113,113,0.4); }
+  /* ── 🚀 Pro Layout Stability (Prevent Scrollbar Jump) ── */
+  html { scrollbar-gutter: stable; }
+
+  #sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; opacity: 0; transition: opacity 0.3s ease; }
+  #sidebar-overlay.active { display: block; opacity: 1; }
+
+  /* ── 🍔 Elite Hamburger Icon ── */
+  .hamburger {
+    width: 32px; height: 24px; position: relative; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+    background: transparent; border: none; padding: 0; transition: transform 0.3s ease;
+  }
+  .hamburger span {
+    display: block; width: 100%; height: 2px; background: #c6c0ff; border-radius: 2px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .hamburger.is-active span:nth-child(1) { transform: translateY(11px) rotate(45deg); }
+  .hamburger.is-active span:nth-child(2) { opacity: 0; transform: translateX(-10px); }
+  .hamburger.is-active span:nth-child(3) { transform: translateY(-11px) rotate(-45deg); }
+
+  /* ── 📏 Sidebar (Hidden by default on all screens) ── */
+  #sidebar { 
+    width: 260px; z-index: 1000;
+  }
+  
+  /* Use !important to ensure we override any Tailwind transforms */
+  #sidebar[data-state="closed"] { transform: translateX(-100%) !important; }
+  #sidebar[data-state="open"] { transform: translateX(0) !important; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+  
+  /* ── Accessibility Rings ── */
+  .hamburger:focus-visible, .sidebar-nav-btn:focus-visible { outline: 2px solid #c6c0ff; outline-offset: 4px; }
+  
+  /* ── Active nav state ── */
+  .active-menu { background: rgba(139, 128, 255, 0.2) !important; color: #c6c0ff !important; border-left: 4px solid #8b80ff !important; }
+</style>
+
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#c6c0ff",
+          "primary-container": "#8b80ff",
+          "on-primary": "#2700a1",
+          "on-primary-container": "#21008e",
+          "secondary": "#5de6ff",
+          "secondary-container": "#00cbe6",
+          "on-secondary": "#00363e",
+          "tertiary": "#ddb8ff",
+          "on-surface": "#e3e0f8",
+          "on-surface-variant": "#c8c4d6",
+          "surface-container-high": "rgba(41,40,58,0.4)",
+          "surface-bright": "rgba(56,55,74,0.5)",
+          "outline": "#928fa0",
+          "outline-variant": "#474554",
+          "error": "#ffb4ab",
+          "error-container": "#93000a",
+          "on-error-container": "#ffdad6",
+          "on-error": "#690005",
+          "background": "#0c0c17",
+        },
+        fontFamily: {
+          headline: ["Space Grotesk"],
+          body:     ["Inter"],
+          label:    ["Inter"],
+        },
+        borderRadius: {
+          DEFAULT: "1rem",
+          lg: "2rem",
+          xl: "3rem",
+          full: "9999px",
+        }
+      }
+    }
+  };
+</script>
+
+<!-- 🐶 Robo Dog Assistant Assets -->
+<link rel="stylesheet" href="./robo-dog/dog.css">
+<script src="./robo-dog/dog.js"></script>
+</head>
+
+<body class="text-on-surface min-h-screen">
+
+<script>
+  // Dashboard Protection Layer (PRO Refinement)
+  if (!localStorage.getItem("token")) {
+    window.location.href = "auth.html";
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    window.location.href = "auth.html";
+  }
+</script>
+
+<!-- 🏗️ Main UI Container (Hidden initially for Robo Dog Intro) -->
+<div id="final-app-ui" style="opacity: 0; pointer-events: none; transition: opacity 1s ease;">
+
+<!-- ══ Galaxy Background ══ -->
+<div id="galaxy-bg">
+  <div class="nebula w-[600px] h-[600px] bg-violet-600/20 top-[-10%] left-[-10%]"></div>
+  <div class="nebula w-[800px] h-[800px] bg-cyan-600/10 bottom-[-20%] right-[-10%]"></div>
+  <div class="nebula w-[500px] h-[500px] bg-blue-600/15 top-[30%] right-[20%]"></div>
+</div>
+
+<div id="nav-status" aria-live="polite" class="sr-only"></div>
+
+<!-- ══ Mobile sidebar overlay ══ -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- ══ Sidebar ══ -->
+<aside id="sidebar" role="navigation" aria-label="Main Navigation" data-state="closed"
+       class="h-screen fixed left-0 top-0 bg-slate-950/80 flex flex-col border-r border-white/5 shadow-2xl"
+       style="backdrop-filter:blur(20px);">
+
+  <!-- Logo -->
+  <div class="px-8 py-10">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-lg shadow-primary/20">
+        <span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings:'FILL' 1;">psychology</span>
+      </div>
+      <div>
+        <h1 class="text-xl font-black text-violet-400 font-headline tracking-tighter">Prep AI</h1>
+        <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">AI Copilot</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav links -->
+  <nav class="flex-1 px-4 space-y-1" id="sidebar-nav">
+    <button onclick="switchMode('evaluate'); closeSidebar();" id="nav-evaluate"
+      class="sidebar-nav-btn active-menu w-full text-left text-violet-300 flex items-center px-5 py-3 rounded-lg group transition-all">
+      <span class="material-symbols-outlined mr-4 text-xl">assignment_turned_in</span>
+      <span class="font-semibold text-sm">Answer Evaluator</span>
+    </button>
+    <button onclick="switchMode('interview'); closeSidebar();" id="nav-interview"
+      class="sidebar-nav-btn w-full text-left text-slate-500 hover:text-cyan-300 hover:bg-slate-800/30 flex items-center px-5 py-3 rounded-lg group transition-all">
+      <span class="material-symbols-outlined mr-4 text-xl">mic</span>
+      <span class="font-semibold text-sm">Mock Interview</span>
+    </button>
+  </nav>
+
+  <!-- Bottom section -->
+  <div class="px-6 py-8 space-y-4">
+    <div class="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-900/50 border border-white/5">
+      <div id="live-dot" class="w-2 h-2 rounded-full bg-slate-600 transition-all"></div>
+      <span id="live-label" class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Not started</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ Main app wrapper (for inert support) ══ -->
+<main id="main-app" class="min-h-screen flex flex-col relative z-10 transition-all duration-300">
+
+  <!-- ── Top Header ── -->
+  <header class="bg-slate-950/20 flex justify-between items-center px-6 lg:px-12 h-16 lg:h-20 sticky top-0 z-50 border-b border-white/5 shadow-lg"
+          style="backdrop-filter:blur(20px);">
+    
+    <div class="flex items-center gap-6">
+      <!-- 🍔 Hamburger Button -->
+      <!-- We move it outside of the inert-capable main-app to be safe -->
+      <button id="hamburger-btn" class="hamburger relative z-[1100]" onclick="toggleSidebar()" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      
+      <div class="hidden lg:block h-6 w-[1px] bg-white/10"></div>
+    </div>
+
+    <!-- Mode tabs (desktop) -->
+    <nav class="hidden md:flex items-center gap-1 bg-slate-900/40 rounded-xl p-1 border border-white/5">
+      <button id="tab-evaluate" onclick="switchMode('evaluate')"
+        class="mode-btn active px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1;">assignment_turned_in</span>
+        Answer Evaluator
+      </button>
+      <button id="tab-interview" onclick="switchMode('interview')"
+        class="mode-btn px-6 py-2 rounded-lg text-slate-500 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:text-slate-300">
+        <span class="material-symbols-outlined text-sm">settings_voice</span>
+        Mock Interview
+      </button>
+    </nav>
+
+    <!-- Right side -->
+    <div class="flex items-center gap-4">
+      <div id="header-status" class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 rounded-full border border-white/5">
+        <div id="header-dot" class="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
+        <span id="header-label" class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Ready</span>
+      </div>
+      
+      <button onclick="logout()" 
+          class="flex items-center gap-2 px-3 py-1.5 bg-slate-900/40 hover:bg-rose-500/10 hover:text-rose-400 rounded-full border border-white/5 transition-all group">
+        <span class="material-symbols-outlined text-sm text-slate-500 group-hover:text-rose-400">logout</span>
+        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-rose-400">Logout</span>
+      </button>
+
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/30 to-primary-container/30 border border-primary/30 flex items-center justify-center">
+        <span class="material-symbols-outlined text-sm text-primary">person</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page body ── -->
+  <section class="p-6 lg:p-12 space-y-10 flex-1">
+
+    <!-- Hero strip -->
+    <div class="relative overflow-hidden rounded-2xl glass-panel p-8 lg:p-12">
+      <div class="absolute inset-0 pointer-events-none">
+        <div class="absolute top-0 right-0 w-64 h-64 rounded-full bg-violet-600/10 blur-3xl"></div>
+        <div class="absolute bottom-0 left-1/3 w-48 h-48 rounded-full bg-cyan-500/8 blur-3xl"></div>
+      </div>
+      <div class="relative">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/50 border border-primary/20 mb-4">
+          <div class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></div>
+          <span class="text-[10px] font-black uppercase tracking-[0.2em] text-secondary">Powered by Gemini AI</span>
+        </div>
+        <h2 class="text-4xl lg:text-6xl font-black font-headline tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-primary to-secondary mb-3">
+          Prep AI Dashboard
+        </h2>
+        <p class="text-on-surface-variant text-base lg:text-lg leading-relaxed max-w-2xl">
+          Master your communication. Evaluate written answers or simulate high-pressure live interviews with real-time AI feedback.
+        </p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL: Answer Evaluator
+    ══════════════════════════════════════ -->
+    <div id="panel-evaluate" class="mode-panel active fade-up">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-10">
+
+        <!-- Input side -->
+        <div class="lg:col-span-3 space-y-6">
+          <div class="glass-panel rounded-2xl p-8 obsidian-shadow relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-8 text-primary/5 pointer-events-none">
+              <span class="material-symbols-outlined" style="font-size:110px;">edit_note</span>
+            </div>
+            <div class="relative space-y-7">
+
+              <!-- Card header -->
+              <div class="flex items-center gap-5 pb-6 border-b border-white/5">
+                <div class="w-12 h-12 rounded-xl bg-slate-800/60 flex items-center justify-center text-primary border border-primary/20">
+                  <span class="material-symbols-outlined text-2xl">terminal</span>
+                </div>
+                <div>
+                  <h3 class="text-xl font-bold font-headline">Evaluation Console</h3>
+                  <p class="text-sm text-on-surface-variant">Paste your response for a deep structural analysis</p>
+                </div>
+              </div>
+
+              <!-- Info chips -->
+              <div class="flex flex-wrap gap-2">
+                <span class="px-3 py-1 rounded-full bg-slate-950/50 text-xs font-bold text-slate-400 border border-white/10 uppercase tracking-widest">🏆 Score</span>
+                <span class="px-3 py-1 rounded-full bg-slate-950/50 text-xs font-bold text-slate-400 border border-white/10 uppercase tracking-widest">💡 Strength</span>
+                <span class="px-3 py-1 rounded-full bg-slate-950/50 text-xs font-bold text-slate-400 border border-white/10 uppercase tracking-widest">⚠️ Weakness</span>
+                <span class="px-3 py-1 rounded-full bg-slate-950/50 text-xs font-bold text-slate-400 border border-white/10 uppercase tracking-widest">✨ Ideal Answer</span>
+              </div>
+
+              <!-- Textarea -->
+              <div>
+                <label for="eval-answer" class="block text-xs font-bold uppercase tracking-widest text-primary/70 mb-2">Your Answer</label>
+                <textarea id="eval-answer"
+                  class="w-full h-56 bg-slate-950/40 rounded-xl border border-white/10 p-5 text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/15 transition-all resize-none leading-relaxed placeholder:text-slate-600"
+                  placeholder="e.g. 'My greatest strength is my ability to manage complex project lifecycles…'&#10;&#10;Press Ctrl+Enter to evaluate quickly."></textarea>
+              </div>
+
+              <!-- Buttons -->
+              <div class="flex gap-3 flex-wrap">
+                <button id="eval-btn" onclick="evaluateAnswer()"
+                  class="flex-1 min-w-[160px] px-6 py-3.5 bg-gradient-to-r from-primary to-primary-container text-on-primary-container rounded-xl font-bold text-xs uppercase tracking-widest obsidian-shadow hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
+                  <span class="material-symbols-outlined text-base">rocket_launch</span>
+                  Evaluate Answer
+                </button>
+                <button onclick="clearEval()"
+                  class="px-6 py-3.5 bg-transparent border border-white/15 text-on-surface-variant rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-white/5 transition-all">
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result side -->
+        <div class="lg:col-span-2">
+          <div class="glass-panel rounded-2xl p-8 obsidian-shadow h-full flex flex-col min-h-[400px]">
+            <div class="flex items-center justify-between mb-6">
+              <h4 class="font-headline text-xl font-bold">AI Feedback</h4>
+              <button onclick="showHistory()" 
+                class="px-3 py-1.5 rounded-lg bg-slate-900/50 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary hover:border-primary/40 transition-all flex items-center gap-2">
+                <span class="material-symbols-outlined text-xs">history</span>
+                History
+              </button>
+            </div>
+
+            <!-- Result box -->
+            <div id="eval-result" class="flex-1 rounded-xl bg-slate-950/30 border border-white/8 p-5 text-sm leading-relaxed text-slate-500 overflow-y-auto mb-4">
+              Submit your answer to see the AI analysis results here.
+            </div>
+            
+            <!-- History box (shared) -->
+            <div id="historyBox" class="hidden rounded-xl bg-slate-950/50 border border-primary/20 p-5 obsidian-shadow fade-up"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL: Mock Interview
+    ══════════════════════════════════════ -->
+    <div id="panel-interview" class="mode-panel fade-up">
+      <div class="space-y-6">
+
+        <!-- Status bar -->
+        <div class="glass-panel rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div id="status-dot" class="w-3 h-3 rounded-full bg-slate-600 transition-all"></div>
+            <span id="status-text" class="text-sm font-bold">Not Started</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="q-counter" class="px-3 py-1 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400">
+              Question: <strong class="text-white">0 / ∞</strong>
+            </span>
+            <button id="reset-btn" onclick="resetMode()"
+              class="px-4 py-1.5 bg-slate-800/60 border border-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-sm">refresh</span> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Topic Selector -->
+        <div id="topic-selector-card" class="glass-panel rounded-2xl p-6 obsidian-shadow">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
+              <span class="material-symbols-outlined text-lg text-primary">category</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold font-headline">Interview Topic</h3>
+              <p class="text-xs text-on-surface-variant">Pick a preset or type your own topic</p>
+            </div>
+          </div>
+
+          <!-- Difficulty Level -->
+          <div class="mb-5 pb-5 border-b border-white/5">
+            <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-primary/70 mb-3">Difficulty Level</label>
+            <div id="difficulty-chips" class="flex flex-wrap gap-2">
+              <button type="button" onclick="selectDifficulty(this,'Easy')"
+                class="diff-chip px-4 py-1.5 rounded-lg bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-emerald-500/50 hover:text-emerald-400 transition-all">
+                🌱 Easy
+              </button>
+              <button type="button" onclick="selectDifficulty(this,'Moderate')"
+                class="diff-chip px-4 py-1.5 rounded-lg bg-primary/10 border border-primary/50 text-xs font-bold text-primary hover:border-primary/50 transition-all">
+                ⚖️ Moderate
+              </button>
+              <button type="button" onclick="selectDifficulty(this,'Hard')"
+                class="diff-chip px-4 py-1.5 rounded-lg bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-rose-500/50 hover:text-rose-400 transition-all">
+                🔥 Hard
+              </button>
+            </div>
+          </div>
+
+          <!-- Preset chips -->
+          <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-primary/70 mb-3">Topic</label>
+          <div id="topic-chips" class="flex flex-wrap gap-2 mb-4">
+            <button type="button" onclick="selectTopic(this,'Data Structures & Algorithms')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              📊 DSA
+            </button>
+            <button type="button" onclick="selectTopic(this,'Object-Oriented Programming')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🧱 OOP
+            </button>
+            <button type="button" onclick="selectTopic(this,'Database Management Systems')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🗄️ DBMS
+            </button>
+            <button type="button" onclick="selectTopic(this,'Operating Systems')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              💻 OS
+            </button>
+            <button type="button" onclick="selectTopic(this,'System Design')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🏗️ System Design
+            </button>
+            <button type="button" onclick="selectTopic(this,'Computer Networks')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🌐 CN
+            </button>
+            <button type="button" onclick="selectTopic(this,'HR & Behavioral')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🤝 HR
+            </button>
+            <button type="button" onclick="selectTopic(this,'React & Frontend')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              ⚛️ React
+            </button>
+            <button type="button" onclick="selectTopic(this,'Python Programming')"
+              class="topic-chip px-3 py-1.5 rounded-full bg-slate-900/50 border border-white/10 text-xs font-bold text-slate-400 hover:border-primary/50 hover:text-primary transition-all">
+              🐍 Python
+            </button>
+          </div>
+
+          <!-- Custom topic input -->
+          <div class="flex gap-3 items-center">
+            <input id="custom-topic" type="text" maxlength="80"
+              class="flex-1 bg-slate-950/40 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-on-surface focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/15 transition-all placeholder:text-slate-600"
+              placeholder="Or type a custom topic e.g. 'Java Spring Boot', 'Machine Learning'…"
+              oninput="onCustomTopicInput(this)">
+            <div id="selected-topic-badge" class="hidden px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-xs font-bold text-primary whitespace-nowrap"></div>
+          </div>
+        </div>
+
+        <!-- Interview grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Question display -->
+          <div class="glass-panel rounded-2xl p-8 obsidian-shadow">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl text-secondary">psychology_alt</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold font-headline">AI Question</h3>
+                <p class="text-xs text-on-surface-variant">Your next interview question</p>
+              </div>
+            </div>
+            <div id="interview-question"
+              class="rounded-xl bg-slate-950/30 border border-white/8 p-5 min-h-[180px] text-sm leading-relaxed text-slate-500">
+              Press <strong class="text-secondary">Start Interview</strong> to receive your first question from the AI interviewer.
+            </div>
+            <button id="start-btn" onclick="startInterview()"
+              class="mt-5 w-full py-3.5 bg-gradient-to-r from-cyan-600 to-secondary text-on-secondary rounded-xl font-bold text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 obsidian-shadow">
+              <span class="material-symbols-outlined text-base">play_arrow</span>
+              Start Interview
+            </button>
+          </div>
+
+          <!-- Answer input -->
+          <div class="glass-panel rounded-2xl p-8 obsidian-shadow">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl text-primary">mic</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold font-headline">Your Answer</h3>
+                <p class="text-xs text-on-surface-variant">Type your response · Ctrl+Enter to submit</p>
+              </div>
+            </div>
+            <textarea id="interview-answer" disabled
+              class="w-full h-[180px] bg-slate-950/30 rounded-xl border border-white/8 p-5 text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all resize-none leading-relaxed placeholder:text-slate-600"
+              placeholder="Start the interview first, then type your answer here…"></textarea>
+            <button id="submit-btn" onclick="sendAnswer()" disabled
+              class="mt-5 w-full py-3.5 bg-gradient-to-r from-primary to-primary-container text-on-primary-container rounded-xl font-bold text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 obsidian-shadow disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none">
+              <span class="material-symbols-outlined text-base">send</span>
+              Submit Answer
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Feedback box -->
+        <div class="glass-panel rounded-2xl p-8 obsidian-shadow">
+          <div class="flex items-center justify-between mb-5 pb-5 border-b border-white/5">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl text-emerald-400">analytics</span>
+              </div>
+              <div>
+                <h3 class="text-base font-bold font-headline">Feedback &amp; Improvement Tips</h3>
+                <p class="text-xs text-on-surface-variant">Score, strengths, and your next challenge</p>
+              </div>
+            </div>
+            <button onclick="showHistory()" 
+              class="px-3 py-1.5 rounded-lg bg-slate-900/50 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-emerald-400 hover:border-emerald-500/40 transition-all flex items-center gap-2">
+              <span class="material-symbols-outlined text-xs">history</span>
+              Show History
+            </button>
+          </div>
+          <div id="interview-feedback"
+            class="rounded-xl bg-slate-950/30 border border-white/8 p-5 min-h-[160px] text-sm leading-relaxed text-slate-500">
+            Feedback will appear here after you submit your first answer…
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Footer -->
+  <footer class="px-6 lg:px-12 py-8 border-t border-white/5 mt-auto" style="backdrop-filter:blur(12px);">
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <p class="text-xs text-slate-600">© 2026 Prep AI · Precision Engineered with Gemini AI</p>
+      <div class="flex gap-6">
+        <a href="#" class="text-xs text-slate-600 hover:text-white transition-colors">Privacy</a>
+        <a href="#" class="text-xs text-slate-600 hover:text-white transition-colors">Terms</a>
+        <a href="https://ai.google.dev/" target="_blank" rel="noopener" class="text-xs text-slate-600 hover:text-primary transition-colors">Gemini API</a>
+      </div>
+    </div>
+  </footer>
+
+</main>
+
+<!-- Toast -->
+<div id="toast" role="alert" aria-live="polite"></div>
+
+<!-- ══════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════ -->
+<script>
+  /* ─── STARS ─────────────────────────────────── */
+  (function createStars() {
+    const bg = document.getElementById('galaxy-bg');
+    for (let i = 0; i < 160; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 2 + 'px';
+      s.style.cssText = `
+        width:${size}; height:${size};
+        left:${Math.random()*100}%;
+        top:${Math.random()*100}%;
+        opacity:${Math.random()};
+        animation-duration:${50 + Math.random()*100}s;
+        animation-delay:${-(Math.random()*100)}s;
+      `;
+      bg.appendChild(s);
+    }
+  })();
+
+  /* ─── STATE ──────────────────────────────────── */
+  let interviewStarted = false;
+  let currentRequestId = 0;
+  let questionCount    = 0;
+  let selectedTopic    = '';
+  let selectedDifficulty = 'Moderate';
+
+  /* ─── DIFFICULTY SELECTOR ───────────────────── */
+  function selectDifficulty(btn, level) {
+    document.querySelectorAll('.diff-chip').forEach(c => {
+      c.classList.remove('border-primary/50', 'text-primary', 'bg-primary/10', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-500/10', 'border-rose-500/50', 'text-rose-400', 'bg-rose-500/10');
+      c.classList.add('border-white/10', 'text-slate-400', 'bg-slate-900/50');
+    });
+
+    btn.classList.remove('border-white/10', 'text-slate-400', 'bg-slate-900/50');
+    
+    if (level === 'Easy') {
+      btn.classList.add('border-emerald-500/50', 'text-emerald-400', 'bg-emerald-500/10');
+    } else if (level === 'Hard') {
+      btn.classList.add('border-rose-500/50', 'text-rose-400', 'bg-rose-500/10');
+    } else {
+      btn.classList.add('border-primary/50', 'text-primary', 'bg-primary/10');
+    }
+    
+    selectedDifficulty = level;
+  }
+
+  /* ─── TOPIC SELECTOR ────────────────────────── */
+  function selectTopic(btn, topic) {
+    // Deselect all chips
+    document.querySelectorAll('.topic-chip').forEach(c => {
+      c.classList.remove('border-primary/50','text-primary','bg-primary/10');
+      c.classList.add('border-white/10','text-slate-400');
+    });
+    // Clear custom input
+    document.getElementById('custom-topic').value = '';
+    // Activate clicked chip
+    btn.classList.remove('border-white/10','text-slate-400');
+    btn.classList.add('border-primary/50','text-primary','bg-primary/10');
+    selectedTopic = topic;
+    showBadge(topic);
+  }
+
+  function onCustomTopicInput(input) {
+    // Deselect all chips when typing custom
+    document.querySelectorAll('.topic-chip').forEach(c => {
+      c.classList.remove('border-primary/50','text-primary','bg-primary/10');
+      c.classList.add('border-white/10','text-slate-400');
+    });
+    selectedTopic = input.value.trim();
+    if (selectedTopic) showBadge(selectedTopic);
+    else hideBadge();
+  }
+
+  function showBadge(topic) {
+    const b = document.getElementById('selected-topic-badge');
+    b.textContent = '🎯 ' + topic;
+    b.classList.remove('hidden');
+  }
+
+  function hideBadge() {
+    document.getElementById('selected-topic-badge').classList.add('hidden');
+  }
+
+  /* ─── SIDEBAR (mobile) ───────────────────────── */
+  function toggleSidebar() {
+    const s = document.getElementById('sidebar');
+    const o = document.getElementById('sidebar-overlay');
+    const isOpen = !s.classList.contains('-translate-x-full');
+    s.classList.toggle('-translate-x-full', isOpen);
+    s.classList.toggle('translate-x-0', !isOpen);
+    o.classList.toggle('show', !isOpen);
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.add('-translate-x-full');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  }
+  // Hide sidebar on mobile by default
+  if (window.innerWidth < 1024) {
+    document.getElementById('sidebar').classList.add('-translate-x-full');
+  }
+
+  /* ─── MODE SWITCHING ─────────────────────────── */
+  function switchMode(mode) {
+    // Panels
+    document.getElementById('panel-evaluate').classList.remove('active');
+    document.getElementById('panel-interview').classList.remove('active');
+    document.getElementById(`panel-${mode}`).classList.add('active');
+
+    // Top tabs
+    ['evaluate','interview'].forEach(m => {
+      document.getElementById(`tab-${m}`).classList.remove('active');
+      document.getElementById(`tab-${m}`).classList.add('text-slate-500');
+    });
+    document.getElementById(`tab-${mode}`).classList.add('active');
+    document.getElementById(`tab-${mode}`).classList.remove('text-slate-500');
+
+    // Sidebar nav buttons
+    document.querySelectorAll('.sidebar-nav-btn').forEach(b => {
+      b.className = 'sidebar-nav-btn w-full text-left text-slate-500 hover:text-cyan-300 hover:bg-slate-800/30 flex items-center px-5 py-3 rounded-lg group transition-all';
+    });
+    const active = document.getElementById(`nav-${mode}`);
+    active.className = 'sidebar-nav-btn w-full text-left text-violet-300 border-l-4 border-violet-500 bg-gradient-to-r from-violet-600/20 to-transparent flex items-center px-5 py-3 rounded-r-lg group transition-all';
+
+    // Close sidebar on mobile after selecting
+    if (window.innerWidth < 1024) closeSidebar();
+  }
+
+  /* ─── RESULT RENDERER ───────────────────────── */
+  const KEY_CFG = {
+    'score':         { label: 'Score',         color: '#fbbf24' },
+    'strength':      { label: 'Strength',       color: '#34d399' },
+    'weakness':      { label: 'Weakness',       color: '#f87171' },
+    'improvement':   { label: 'Improvement',    color: '#22d3ee' },
+    'ideal answer':  { label: 'Ideal Answer',   color: '#c6c0ff' },
+    'feedback':      { label: 'Feedback',       color: '#22d3ee' },
+    'next question': { label: 'Next Question',  color: '#fbbf24' },
+  };
+
+  function renderResult(boxId, raw) {
+    const box = document.getElementById(boxId);
+    box.className = box.className.replace('text-slate-500','text-on-surface');
+
+    const lines = raw.split('\n');
+    const sections = [];
+    let cur = null;
+
+    lines.forEach(line => {
+      const t = line.trim();
+      if (!t) return;
+      let matched = false;
+      for (const [key, cfg] of Object.entries(KEY_CFG)) {
+        if (t.toLowerCase().startsWith(key + ':')) {
+          if (cur) sections.push(cur);
+          cur = { cfg, val: t.slice(key.length + 1).trim() };
+          matched = true; break;
+        }
+      }
+      if (!matched) {
+        if (cur) cur.val += (cur.val ? '\n' : '') + t;
+        else sections.push({ cfg: { label:'', color:'#c8c4d6' }, val: t });
+      }
+    });
+    if (cur) sections.push(cur);
+
+    if (!sections.length) { box.textContent = raw; return; }
+
+    box.innerHTML = sections.map(s => `
+      <div class="res-section">
+        ${s.cfg.label ? `<div class="res-key" style="color:${s.cfg.color}">${s.cfg.label}</div>` : ''}
+        <div class="res-val">${esc(s.val)}</div>
+      </div>`).join('');
+  }
+
+  function esc(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function setLoading(id, msg) {
+    const b = document.getElementById(id);
+    b.innerHTML = `<div class="flex items-center gap-3 text-primary/80"><div class="spinner"></div> <span class="text-sm">${msg}</span></div>`;
+    b.className = b.className.replace('text-slate-500','').replace('text-on-surface','');
+  }
+
+  function setPlaceholder(id, msg) {
+    const b = document.getElementById(id);
+    b.className = b.className.replace('text-on-surface','') + ' text-slate-500';
+    b.textContent = msg;
+  }
+
+  /* ─── TOAST ─────────────────────────────────── */
+  let _toastTimer;
+  function showToast(msg, type = 'info') {
+    clearTimeout(_toastTimer);
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    _toastTimer = setTimeout(() => t.className = '', 3200);
+  }
+
+  /* ─── SCORE TRACKING (BACKEND) ─────────────── */
+  async function recordScore(rawText) {
+    const scoreMatch = rawText.match(/Score:\s*(\d+(\.\d+)?)/);
+    if (!scoreMatch) return;
+    
+    const score = scoreMatch[1];
+    try {
+      await fetch('/score-tracker/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score })
+      });
+    } catch (err) {
+      console.warn("Failed to record score:", err);
+    }
+  }
+
+  async function showHistory() {
+    const box = document.getElementById("historyBox");
+    
+    // Toggle logic
+    if (!box.classList.contains("hidden")) {
+      box.classList.add("hidden");
+      return;
+    }
+
+    box.innerHTML = `<div class="flex items-center gap-3 text-slate-500"><div class="spinner"></div> <span class="text-xs font-bold uppercase tracking-widest">Loading History...</span></div>`;
+    box.classList.remove("hidden");
+
+    try {
+      const res = await fetch('/score-tracker');
+      const scores = await res.json();
+
+      if (scores.length === 0) {
+        box.innerHTML = `
+          <div class="flex items-center gap-2 text-slate-500 italic p-2 text-xs">
+            <span class="material-symbols-outlined text-sm">info</span>
+            No scores recorded yet. Complete an evaluation!
+          </div>`;
+        return;
+      }
+
+      let html = `
+        <div class="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-primary">Score History</h3>
+          <button onclick="document.getElementById('historyBox').classList.add('hidden')" class="text-slate-600 hover:text-white transition-colors">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+        <div class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">`;
+      
+      scores.reverse().forEach((s, i) => {
+        html += `
+          <div class="history-item flex items-center justify-between p-3 rounded-lg border border-white/5">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Attempt ${scores.length - i}</span>
+            <span class="font-headline font-bold text-emerald-400 text-sm">${s}/10</span>
+          </div>`;
+      });
+      html += `</div>`;
+      box.innerHTML = html;
+    } catch (err) {
+      box.innerHTML = `<div class="text-rose-400 text-xs font-bold uppercase p-2">Failed to load history</div>`;
+    }
+  }
+
+  /* ─── EVALUATE ──────────────────────────────── */
+  async function evaluateAnswer() {
+    const answer = document.getElementById('eval-answer').value.trim();
+    if (!answer) { showToast('⚠️ Please enter your answer first', 'error'); return; }
+
+    const btn = document.getElementById('eval-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Evaluating…';
+
+    setLoading('eval-result', 'Analysing your answer with Gemini AI…');
+
+    try {
+      const res  = await fetch('/evaluate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ answer }) });
+      const data = await res.json();
+      renderResult('eval-result', data.result);
+      recordScore(data.result); // Track score
+      showToast('✅ Evaluation complete!', 'success');
+    } catch {
+      setPlaceholder('eval-result', '❌ Failed to evaluate. Make sure the server is running.');
+      showToast('❌ Network error', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined text-base">rocket_launch</span> Evaluate Answer';
+    }
+  }
+
+  function clearEval() {
+    document.getElementById('eval-answer').value = '';
+    setPlaceholder('eval-result', 'Submit your answer to see the AI analysis results here.');
+  }
+
+  /* ─── INTERVIEW ─────────────────────────────── */
+  function setInterviewUI(running) {
+    interviewStarted = running;
+
+    // Status dot + label
+    const dot   = document.getElementById('status-dot');
+    const label = document.getElementById('status-text');
+    const hdot  = document.getElementById('header-dot');
+    const hlab  = document.getElementById('header-label');
+    const liveDot   = document.getElementById('live-dot');
+    const liveLabel = document.getElementById('live-label');
+
+    if (running) {
+      dot.className   = 'w-3 h-3 rounded-full bg-emerald-400 animate-pulse transition-all';
+      label.textContent = 'Live Session';
+      hdot.className  = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+      hlab.textContent  = 'Live';
+      hlab.className    = 'text-[10px] font-bold uppercase tracking-widest text-emerald-400';
+      liveDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse transition-all';
+      liveLabel.textContent = 'Live Session';
+      liveLabel.className   = 'text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400';
+    } else {
+      dot.className   = 'w-3 h-3 rounded-full bg-slate-600 transition-all';
+      label.textContent = 'Not Started';
+      hdot.className  = 'w-1.5 h-1.5 rounded-full bg-slate-600';
+      hlab.textContent  = 'Ready';
+      hlab.className    = 'text-[10px] font-bold uppercase tracking-widest text-slate-500';
+      liveDot.className = 'w-2 h-2 rounded-full bg-slate-600 transition-all';
+      liveLabel.textContent = 'Not started';
+      liveLabel.className   = 'text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500';
+    }
+
+    document.getElementById('interview-answer').disabled = !running;
+    document.getElementById('submit-btn').disabled       = !running;
+    document.getElementById('start-btn').disabled        = running;
+    document.getElementById('start-btn').style.opacity  = running ? '0.4' : '1';
+
+    // Lock / unlock topic & difficulty selector during session
+    const chips = document.querySelectorAll('.topic-chip, .diff-chip');
+    const customInput = document.getElementById('custom-topic');
+    chips.forEach(c => { c.disabled = running; c.style.opacity = running ? '0.4' : '1'; c.style.pointerEvents = running ? 'none' : 'auto'; });
+    customInput.disabled = running;
+    customInput.style.opacity = running ? '0.45' : '1';
+  }
+
+  function updateCounter() {
+    document.getElementById('q-counter').innerHTML =
+      `Question: <strong class="text-white">${questionCount} / ∞</strong>`;
+  }
+
+  async function startInterview() {
+    const reqId = ++currentRequestId;
+    questionCount = 0;
+    setInterviewUI(true);
+    updateCounter();
+    document.getElementById('interview-answer').value = '';
+    const topicLabel = selectedTopic || 'General Technical';
+    setLoading('interview-question', `Generating your first ${selectedDifficulty.toLowerCase()} ${topicLabel} question…`);
+    setPlaceholder('interview-feedback', 'Feedback will appear here after you submit your first answer…');
+
+    try {
+      const res  = await fetch('/interview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ topic: topicLabel, difficulty: selectedDifficulty }) });
+      if (reqId !== currentRequestId) return;
+      const data = await res.json();
+      questionCount = 1;
+      updateCounter();
+      renderResult('interview-question', data.result);
+      document.getElementById('interview-answer').focus();
+      showToast('🎤 Interview started! Good luck!', 'success');
+    } catch {
+      if (reqId !== currentRequestId) return;
+      setInterviewUI(false);
+      setPlaceholder('interview-question', '❌ Failed to start. Check server connection.');
+      showToast('❌ Unable to start interview', 'error');
+    }
+  }
+
+  async function sendAnswer() {
+    const answer = document.getElementById('interview-answer').value.trim();
+    if (!interviewStarted) { showToast('⚠️ Start the interview first!', 'error'); return; }
+    if (!answer)           { showToast('⚠️ Please type your answer', 'error'); return; }
+
+    const reqId = ++currentRequestId;
+    const btn   = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Processing…';
+
+    setLoading('interview-feedback', 'Evaluating your answer & preparing next question…');
+
+    try {
+      const res  = await fetch('/interview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ answer, topic: selectedTopic || 'General Technical', difficulty: selectedDifficulty }) });
+      if (reqId !== currentRequestId) return;
+      const data = await res.json();
+      questionCount++;
+      updateCounter();
+
+      // Extract Next Question before rendering feedback box
+      const nqMatch = data.result.match(/Next Question[:\s]+([\s\S]+?)(?:\n[A-Z]|$)/i);
+
+      // Strip "Next Question" block from feedback display
+      const feedbackOnly = data.result
+        .split('\n')
+        .filter(line => !line.trim().toLowerCase().startsWith('next question'))
+        .join('\n')
+        .trim();
+      renderResult('interview-feedback', feedbackOnly);
+      recordScore(data.result); // Track score from interview
+
+      // Auto-promote next question to the question box
+      if (nqMatch) {
+        setTimeout(() => {
+          const qbox = document.getElementById('interview-question');
+          qbox.innerHTML = `<div class="res-section"><div class="res-key" style="color:#fbbf24">Question</div><div class="res-val">${esc(nqMatch[1].trim())}</div></div>`;
+          qbox.className = qbox.className.replace('text-slate-500','text-on-surface');
+        }, 700);
+      }
+
+      document.getElementById('interview-answer').value = '';
+      document.getElementById('interview-answer').focus();
+      showToast('✅ Answer submitted!', 'success');
+    } catch {
+      if (reqId !== currentRequestId) return;
+      setPlaceholder('interview-feedback', '❌ Error submitting answer.');
+      showToast('❌ Network error', 'error');
+    } finally {
+      if (reqId === currentRequestId) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-base">send</span> Submit Answer';
+      }
+    }
+  }
+
+  function resetMode() {
+    currentRequestId++;
+    questionCount = 0;
+    interviewStarted = false;
+    selectedTopic = '';
+    selectedDifficulty = 'Moderate';
+    setInterviewUI(false);
+    updateCounter();
+    document.getElementById('interview-answer').value = '';
+    document.getElementById('custom-topic').value = '';
+    
+    // Reset topic chips
+    document.querySelectorAll('.topic-chip').forEach(c => {
+      c.classList.remove('border-primary/50','text-primary','bg-primary/10');
+      c.classList.add('border-white/10','text-slate-400');
+    });
+
+    // Reset difficulty chips
+    document.querySelectorAll('.diff-chip').forEach(c => {
+      c.classList.remove('border-primary/50', 'text-primary', 'bg-primary/10', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-500/10', 'border-rose-500/50', 'text-rose-400', 'bg-rose-500/10');
+      c.classList.add('border-white/10', 'text-slate-400', 'bg-slate-900/50');
+    });
+    const modBtn = Array.from(document.querySelectorAll('.diff-chip')).find(b => b.textContent.includes('Moderate'));
+    if (modBtn) modBtn.classList.add('border-primary/50', 'text-primary', 'bg-primary/10');
+
+    hideBadge();
+    setPlaceholder('interview-question', 'Press Start Interview to receive your first question from the AI interviewer.');
+    setPlaceholder('interview-feedback', 'Feedback will appear here after you submit your first answer…');
+    showToast('🔄 Session reset', 'info');
+  }
+
+  /* ─── 🍔 Elite Sidebar Logic ──────────────── */
+  window.isNavAnimating = false;
+
+  window.toggleSidebar = function() {
+    if (window.isNavAnimating) return;
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const burger  = document.getElementById('hamburger-btn');
+    const mainApp = document.getElementById('main-app');
+    const status  = document.getElementById('nav-status');
+    const isOpen  = sidebar.getAttribute('data-state') === 'open';
+
+    window.isNavAnimating = true;
+    
+    // Calculate scrollbar width for compensation
+    const sbWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    if (!isOpen) {
+      // OPEN SIDEBAR
+      sidebar.setAttribute('data-state', 'open');
+      burger.classList.add('is-active');
+      burger.setAttribute('aria-expanded', 'true');
+      overlay.classList.add('active');
+      
+      // Compensate for scrollbar removal to prevent layout shift
+      document.body.style.paddingRight = `${sbWidth}px`;
+      document.body.style.overflow = 'hidden';
+      status.innerText = "Navigation opened";
+      
+      // Focus Trap & Inert
+      setTimeout(() => {
+        const firstBtn = sidebar.querySelector('button');
+        if (firstBtn) firstBtn.focus();
+        if ('inert' in mainApp) mainApp.inert = true;
+      }, 100);
+    } else {
+      // CLOSE SIDEBAR
+      sidebar.setAttribute('data-state', 'closed');
+      burger.classList.remove('is-active');
+      burger.setAttribute('aria-expanded', 'false');
+      overlay.classList.remove('active');
+      if ('inert' in mainApp) mainApp.inert = false;
+      status.innerText = "Navigation closed";
+      
+      const onEnd = () => {
+        document.body.style.overflow = 'auto';
+        document.body.style.paddingRight = '0px';
+        burger.focus();
+        sidebar.removeEventListener('transitionend', onEnd);
+      };
+      sidebar.addEventListener('transitionend', onEnd);
+    }
+
+    setTimeout(() => window.isNavAnimating = false, 400);
+  }
+
+  window.closeSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.getAttribute('data-state') === 'open') {
+      window.toggleSidebar();
+    }
+  }
+
+  // Focus Trap Loop
+  document.getElementById('sidebar').addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const btns = document.getElementById('sidebar').querySelectorAll('button');
+    const first = btns[0];
+    const last = btns[btns.length - 1];
+
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  });
+
+  // ESC Support
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSidebar();
+  });
+
+  /* ─── Keyboard shortcuts ────────────────────── */
+  document.getElementById('eval-answer').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') evaluateAnswer();
+  });
+  document.getElementById('interview-answer').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') sendAnswer();
+  });
+</script>
+
+</div>
+
+</body>
+</html>
