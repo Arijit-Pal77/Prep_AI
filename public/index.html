@@ -789,21 +789,7 @@
   }
 
   /* ─── SCORE TRACKING (BACKEND) ─────────────── */
-  async function recordScore(rawText) {
-    const scoreMatch = rawText.match(/Score:\s*(\d+(\.\d+)?)/);
-    if (!scoreMatch) return;
-    
-    const score = scoreMatch[1];
-    try {
-      await fetch('/score-tracker/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score })
-      });
-    } catch (err) {
-      console.warn("Failed to record score:", err);
-    }
-  }
+  // Score recording is now handled automatically by the backend.
 
   async function showHistory() {
     const box = document.getElementById("historyBox");
@@ -818,38 +804,58 @@
     box.classList.remove("hidden");
 
     try {
-      const res = await fetch('/score-tracker');
-      const scores = await res.json();
+      const res = await fetch('/score-tracker', {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      const result = await res.json();
 
-      if (scores.length === 0) {
+      if (!result.success || !result.data || result.data.length === 0) {
         box.innerHTML = `
-          <div class="flex items-center gap-2 text-slate-500 italic p-2 text-xs">
-            <span class="material-symbols-outlined text-sm">info</span>
-            No scores recorded yet. Complete an evaluation!
+          <div class="flex flex-col items-center justify-center gap-3 text-slate-500 italic p-8 text-center">
+            <span class="material-symbols-outlined text-4xl opacity-20">history_edu</span>
+            <p class="text-xs">No evaluation history found.<br>Complete a session to see your progress!</p>
           </div>`;
         return;
       }
 
+      const scores = result.data;
+
       let html = `
-        <div class="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-          <h3 class="text-xs font-black uppercase tracking-[0.2em] text-primary">Score History</h3>
-          <button onclick="document.getElementById('historyBox').classList.add('hidden')" class="text-slate-600 hover:text-white transition-colors">
+        <div class="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
+          <div>
+            <h3 class="text-xs font-black uppercase tracking-[0.2em] text-primary">Performance History</h3>
+            <p class="text-[10px] text-slate-500 font-bold uppercase mt-1">Found ${scores.length} attempts</p>
+          </div>
+          <button onclick="document.getElementById('historyBox').classList.add('hidden')" class="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
             <span class="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
-        <div class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">`;
+        <div class="space-y-3 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">`;
       
-      scores.reverse().forEach((s, i) => {
+      scores.forEach((s, i) => {
+        const date = new Date(s.created_at).toLocaleDateString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
         html += `
-          <div class="history-item flex items-center justify-between p-3 rounded-lg border border-white/5">
-            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Attempt ${scores.length - i}</span>
-            <span class="font-headline font-bold text-emerald-400 text-sm">${s}/10</span>
+          <div class="history-item group bg-slate-900/40 hover:bg-slate-800/40 p-4 rounded-xl border border-white/5 hover:border-primary/30 transition-all cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">${date}</span>
+              <div class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black">
+                SCORE: ${s.score}/10
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
+              ${esc(s.feedback.split('\n')[0] || 'View detailed feedback...')}
+            </p>
           </div>`;
       });
-      html += `</div>`;
+      html += `</div>
+        <button onclick="resetHistory()" class="mt-4 w-full py-2 text-[10px] font-black uppercase tracking-[0.2em] text-rose-500/60 hover:text-rose-400 hover:bg-rose-500/5 rounded-lg transition-all">
+          Clear History
+        </button>`;
       box.innerHTML = html;
     } catch (err) {
-      box.innerHTML = `<div class="text-rose-400 text-xs font-bold uppercase p-2">Failed to load history</div>`;
+      box.innerHTML = `<div class="text-rose-400 text-xs font-bold uppercase p-4 text-center">Failed to synchronize history</div>`;
     }
   }
 
@@ -865,11 +871,17 @@
     setLoading('eval-result', 'Analysing your answer with Gemini AI…');
 
     try {
-      const res  = await fetch('/evaluate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ answer }) });
+      const res  = await fetch('/evaluate', { 
+        method:'POST', 
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        }, 
+        body: JSON.stringify({ answer }) 
+      });
       const data = await res.json();
       renderResult('eval-result', data.result);
-      recordScore(data.result); // Track score
-      showToast('✅ Evaluation complete!', 'success');
+      showToast('✅ Evaluation saved to history!', 'success');
     } catch {
       setPlaceholder('eval-result', '❌ Failed to evaluate. Make sure the server is running.');
       showToast('❌ Network error', 'error');
@@ -945,7 +957,14 @@
     setPlaceholder('interview-feedback', 'Feedback will appear here after you submit your first answer…');
 
     try {
-      const res  = await fetch('/interview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ topic: topicLabel, difficulty: selectedDifficulty }) });
+      const res  = await fetch('/interview', { 
+        method:'POST', 
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        }, 
+        body: JSON.stringify({ topic: topicLabel, difficulty: selectedDifficulty }) 
+      });
       if (reqId !== currentRequestId) return;
       const data = await res.json();
       questionCount = 1;
@@ -974,7 +993,14 @@
     setLoading('interview-feedback', 'Evaluating your answer & preparing next question…');
 
     try {
-      const res  = await fetch('/interview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ answer, topic: selectedTopic || 'General Technical', difficulty: selectedDifficulty }) });
+      const res  = await fetch('/interview', { 
+        method:'POST', 
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        }, 
+        body: JSON.stringify({ answer, topic: selectedTopic || 'General Technical', difficulty: selectedDifficulty }) 
+      });
       if (reqId !== currentRequestId) return;
       const data = await res.json();
       questionCount++;
@@ -990,7 +1016,6 @@
         .join('\n')
         .trim();
       renderResult('interview-feedback', feedbackOnly);
-      recordScore(data.result); // Track score from interview
 
       // Auto-promote next question to the question box
       if (nqMatch) {
@@ -1013,6 +1038,22 @@
         btn.disabled = false;
         btn.innerHTML = '<span class="material-symbols-outlined text-base">send</span> Submit Answer';
       }
+    }
+  }
+
+  async function resetHistory() {
+    if (!confirm("Are you sure you want to permanently delete your history?")) return;
+    try {
+      await fetch('/score-tracker/reset', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      document.getElementById('historyBox').classList.add('hidden');
+      showToast('🗑️ History cleared', 'info');
+    } catch (err) {
+      showToast('❌ Failed to clear history', 'error');
     }
   }
 

@@ -1,12 +1,15 @@
 import express from "express";
 import { callGemini } from "../services/gemini.js";
+import pool from "../services/db.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", async (req, res) => {
+router.post("/", authMiddleware, async (req, res) => {
     try {
         console.log("Interview Request Body:", req.body);
         const { answer, topic = "General technical", difficulty = "Moderate" } = req.body;
+        const userId = req.user.id;
 
         let prompt = "";
 
@@ -51,6 +54,25 @@ Rules:
         }
 
         const result = await callGemini(prompt, process.env.API_KEY);
+
+        // 💾 Save to Database if it's an evaluation (i.e., answer was provided)
+        if (answer) {
+            const scoreMatch = result.match(/Score:\s*(\d+(\.\d+)?)/);
+            const score = scoreMatch ? parseFloat(scoreMatch[1]) : null;
+
+            if (score !== null) {
+                try {
+                    await pool.execute(
+                        "INSERT INTO scores (user_id, score, feedback) VALUES (?, ?, ?)",
+                        [userId, score, result]
+                    );
+                    console.log(`✅ Interview Score of ${score} saved for user ${userId}`);
+                } catch (dbErr) {
+                    console.error("DB ERROR saving interview score:", dbErr);
+                }
+            }
+        }
+
         res.json({ result });
 
     } catch (error) {
