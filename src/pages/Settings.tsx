@@ -17,7 +17,8 @@ import {
   Sparkles,
   ArrowLeft,
   Menu,
-  X
+  X,
+  Rocket
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -26,11 +27,19 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = React.useState("general");
   const [successMsg, setSuccessMsg] = React.useState("");
   const [currentTheme, setCurrentTheme] = React.useState(() => JSON.parse(localStorage.getItem("app-theme") || "{}"));
+  const [bgTheme, setBgTheme] = React.useState(() => localStorage.getItem("app-bg-theme") || "stars");
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const handleAction = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const applyBgTheme = (type: string) => {
+    setBgTheme(type);
+    localStorage.setItem("app-bg-theme", type);
+    window.dispatchEvent(new Event("app-bg-update"));
+    handleAction(`3D Environment: ${type.toUpperCase()} active`);
   };
 
   const applyThemeProperty = (key: string, value: string) => {
@@ -119,6 +128,7 @@ export default function SettingsPage() {
                       setCurrentTheme(updated);
                       localStorage.setItem("app-theme", JSON.stringify(updated));
                       Object.entries(p.colors).forEach(([k, v]) => document.documentElement.style.setProperty(`--${k}`, v));
+                      window.dispatchEvent(new Event("storage"));
                       handleAction(`${p.name} theme applied.`);
                     }}
                     className={`p-4 rounded-xl border font-micro transition-all flex flex-col items-center gap-3 ${currentTheme["bg-dark"] === p.colors["bg-dark"] ? 'border-accent-primary bg-accent-primary/5 text-accent-primary shadow-[0_0_15px_rgba(139,128,255,0.1)]' : 'border-border-dim bg-black/20 text-text-dim hover:border-white/20'}`}
@@ -195,6 +205,31 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h4 className="font-micro border-b border-border-dim pb-4">3D Environment</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: "stars", label: "Neural Space", icon: <Sparkles size={14} /> },
+                    { id: "particles", label: "Quantum Dust", icon: <Database size={14} /> },
+                    { id: "grid", label: "System Matrix", icon: <Globe size={14} /> },
+                    { id: "shapes", label: "Geometry", icon: <Rocket size={14} /> },
+                    { id: "abstract", label: "Deep Void", icon: <Shield size={14} /> },
+                    { id: "none", label: "Off", icon: <X size={14} /> }
+                  ].map(b => (
+                    <button
+                      key={b.id}
+                      onClick={() => applyBgTheme(b.id)}
+                      className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all ${bgTheme === b.id ? 'border-accent-primary bg-accent-primary/5 text-accent-primary' : 'border-border-dim hover:border-white/20 text-text-dim'}`}
+                    >
+                      <div className={`p-2 rounded-lg bg-black/40 ${bgTheme === b.id ? 'text-accent-primary' : 'text-text-dim'}`}>
+                        {b.icon}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-widest font-bold font-micro">{b.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

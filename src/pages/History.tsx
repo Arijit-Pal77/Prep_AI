@@ -15,7 +15,8 @@ import {
   Filter,
   X,
   AlertCircle,
-  Menu
+  Menu,
+  Trash2
 } from "lucide-react";
 
 export default function HistoryPage() {
@@ -25,10 +26,11 @@ export default function HistoryPage() {
   const [filterType, setFilterType] = React.useState<string | null>(null);
   const [selectedSession, setSelectedSession] = React.useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
   const [history, setHistory] = React.useState(() => {
     const saved = JSON.parse(localStorage.getItem("app-sessions") || "[]");
-    if (saved.length === 0) {
+    if (saved.length === 0 && localStorage.getItem("app-sessions") === null) {
       return [
         { id: 1, type: "Evaluator", date: "2026-04-15", time: "14:30", score: "85", topic: "Intro to React", details: "Score: 85\nStrength: Clear structure\nWeakness: Needs more technical depth\nIdeal Answer: React is a library for building user interfaces..." },
         { id: 2, type: "Interview", date: "2026-04-14", time: "09:15", score: "72", topic: "Software Engineering", details: "Question: What is polymorphism?\nAnswer: It is many forms.\n\nFeedback: You should refine the definition with examples from OOP like method overriding." },
@@ -38,6 +40,12 @@ export default function HistoryPage() {
     }
     return saved;
   });
+
+  const handleDeleteAll = () => {
+    localStorage.setItem("app-sessions", JSON.stringify([]));
+    setHistory([]);
+    setShowDeleteConfirm(false);
+  };
 
   const filteredHistory = history.filter((item: any) => {
     const topic = item.topic || "";
@@ -60,6 +68,42 @@ export default function HistoryPage() {
             onClick={() => setIsSidebarOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] lg:hidden"
           />
+        )}
+      </AnimatePresence>
+
+      {/* Delete All Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass-card p-8 max-w-sm w-full text-center space-y-6"
+            >
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto text-red-500">
+                <Trash2 size={32} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold font-headline text-text-main">Clear History?</h3>
+                <p className="text-sm text-text-dim">This will permanently delete all your session history. This action cannot be undone.</p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 bg-panel-bg border border-border-dim rounded-xl font-micro hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleDeleteAll}
+                  className="flex-1 py-3 bg-red-500/80 hover:bg-red-500 text-white rounded-xl font-micro transition-all"
+                >
+                  Delete All
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -211,6 +255,16 @@ export default function HistoryPage() {
                     <button onClick={() => setFilterType("Interview")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Interview</button>
                   </div>
                 </div>
+
+                {history.length > 0 && (
+                  <button 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg font-micro text-red-500 hover:bg-red-500/20 transition-all"
+                  >
+                    <Trash2 size={14} />
+                    Clear All
+                  </button>
+                )}
               </div>
             </div>
 
