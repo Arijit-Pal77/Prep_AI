@@ -12,7 +12,7 @@ function getAI() {
     return null;
   }
   
-  aiInstance = new GoogleGenAI(apiKey);
+  aiInstance = new GoogleGenAI({ apiKey });
   return aiInstance;
 }
 
