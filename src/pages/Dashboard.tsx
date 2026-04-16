@@ -18,25 +18,33 @@ import {
   Rocket,
   BrainCircuit,
   Menu,
-  X
+  X,
+  LineChart,
+  BarChart as BarChartIcon,
+  Activity,
+  Award
 } from "lucide-react";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn } from "../lib/gemini";
+import { StatCard, PerformanceAreaChart, TopicAnalysisChart } from "../components/StatsComponents";
 
-type Mode = "evaluate" | "interview";
+type Mode = "evaluate" | "interview" | "analytics";
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [mode, setMode] = useState<Mode>((searchParams.get("mode") as Mode) || "evaluate");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     const urlMode = searchParams.get("mode");
-    if (urlMode === "evaluate" || urlMode === "interview") {
+    if (urlMode === "evaluate" || urlMode === "interview" || urlMode === "analytics") {
       setMode(urlMode);
     }
   }, [searchParams]);
+
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -51,7 +59,7 @@ export default function Dashboard() {
     history: [],
     feedback: null
   });
-  
+
   const [topic, setTopic] = useState("Software Engineering");
   const [customTopic, setCustomTopic] = useState("");
   const [difficulty, setDifficulty] = useState("Moderate");
@@ -62,10 +70,15 @@ export default function Dashboard() {
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     } else {
-      // Fetch profile if not in localStorage
       fetchProfile();
     }
   }, []);
+
+  useEffect(() => {
+    if (mode === "analytics") {
+      fetchStats();
+    }
+  }, [mode]);
 
   const fetchProfile = async () => {
     try {
@@ -85,24 +98,66 @@ export default function Dashboard() {
     }
   };
 
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      const res = await fetch("/api/stats", {
+        headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/auth");
   };
 
-  const saveSession = (type: Mode, topic: string, score: number, details: string) => {
+  const saveSession = async (type: "evaluate" | "interview", topic: string, score: number, details: string) => {
+    // Save to LocalStorage for offline/immediate view
     const sessions = JSON.parse(localStorage.getItem("app-sessions") || "[]");
-    const newSession = {
+    const date = new Date().toISOString().split('T')[0];
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    
+    const newSessionLocal = {
       id: Date.now(),
       type: type === "evaluate" ? "Evaluator" : "Interview",
       topic: topic,
       score: score.toString(),
       details: details,
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+      date,
+      time
     };
-    localStorage.setItem("app-sessions", JSON.stringify([newSession, ...sessions]));
+    localStorage.setItem("app-sessions", JSON.stringify([newSessionLocal, ...sessions]));
+
+    // Save to Backend for Analytics
+    try {
+      await fetch("/api/sessions", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          type: type === "evaluate" ? "Evaluator" : "Interview",
+          topic,
+          score,
+          details,
+          date,
+          time
+        })
+      });
+    } catch (err) {
+      console.error("Could not sync session to backend", err);
+    }
   };
 
   const handleEvaluate = async () => {
@@ -112,7 +167,6 @@ export default function Dashboard() {
       const resp = await evaluateAnswer(answer);
       setResult(resp || "No evaluation found");
       
-      // Attempt to extract score
       const scoreMatch = resp?.match(/Score:\s*(\d+)/i);
       if (scoreMatch) {
         saveSession("evaluate", "Answer Evaluation", parseInt(scoreMatch[1]), resp || "");
@@ -154,8 +208,9 @@ export default function Dashboard() {
       const scoreMatch = resp?.match(/Score:\s*(\d+)/i);
 
       if (scoreMatch) {
+        const finalTopic = topic === "Custom" ? customTopic : topic;
         const sessionDetails = `Question: ${interviewState.currentQuestion}\nAnswer: ${answer}\n\nFeedback: ${feedbackMatch ? feedbackMatch[1].trim() : "Good effort!"}`;
-        saveSession("interview", topic, parseInt(scoreMatch[1]), sessionDetails);
+        saveSession("interview", finalTopic || "Interview", parseInt(scoreMatch[1]), sessionDetails);
       }
 
       setInterviewState(prev => ({
@@ -170,6 +225,84 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderAnalytics = () => {
+    if (statsLoading && !stats) {
+      return (
+        <div className="h-96 flex items-center justify-center">
+          <Loader2 className="animate-spin w-8 h-8 text-accent-primary" />
+        </div>
+      );
+    }
+
+    if (!stats || stats.overview.totalAttempts === 0) {
+      return (
+        <div className="glass-card p-20 text-center opacity-50 flex flex-col items-center">
+          <AlertCircle size={48} className="mb-4" />
+          <h2 className="text-xl font-bold font-headline mb-2">No Performance Data</h2>
+          <p className="font-micro">Complete some practice sessions to unlock analytics.</p>
+          <button 
+            onClick={() => setMode("evaluate")}
+            className="btn-minimal mt-8 px-8"
+          >
+            Start Practice
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard 
+            label="Total Attempts" 
+            value={stats.overview.totalAttempts} 
+            icon={<Activity size={20} />} 
+            color="bg-violet-600"
+          />
+          <StatCard 
+            label="Mastery Level" 
+            value={`${stats.overview.avgScore}%`} 
+            icon={<Award size={20} />} 
+            color="bg-cyan-500"
+          />
+          <StatCard 
+            label="Record High" 
+            value={`${stats.overview.recordHigh}%`} 
+            icon={<Trophy size={20} />} 
+            color="bg-amber-500"
+          />
+          <StatCard 
+            label="Consistency" 
+            value={`${stats.overview.consistency}%`} 
+            icon={<Target size={20} />} 
+            color="bg-emerald-500"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 glass-card p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold font-headline flex items-center gap-2">
+                <LineChart className="text-accent-primary" size={20} />
+                Progress Timeline
+              </h3>
+              <div className="text-[10px] font-micro opacity-40 uppercase tracking-widest">Last 30 Sessions</div>
+            </div>
+            <PerformanceAreaChart data={stats.trend} />
+          </div>
+
+          <div className="glass-card p-8">
+            <h3 className="text-lg font-bold font-headline mb-6 flex items-center gap-2">
+              <BarChartIcon className="text-accent-secondary" size={20} />
+              Domain Mastery
+            </h3>
+            <TopicAnalysisChart data={stats.topicAnalysis} />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -205,7 +338,7 @@ export default function Dashboard() {
           <NavItem 
             icon={<LayoutDashboard size={18}/>} 
             label="Dashboard" 
-            active={mode === "evaluate" || mode === "interview"}
+            active={mode === "evaluate" || mode === "interview" || mode === "analytics"}
           />
           <NavItem 
             icon={<User size={18}/>} 
@@ -227,7 +360,7 @@ export default function Dashboard() {
         <div className="pt-6 border-t border-border-dim mt-6">
           <div className="font-micro leading-relaxed mb-4">
             System Securely Encrypted<br />
-            MySQL Connected
+            Analytics Engine Live
           </div>
           <button 
             onClick={logout}
@@ -257,7 +390,7 @@ export default function Dashboard() {
               <Menu size={24} />
             </button>
             <h2 className="font-micro">
-              {mode === "evaluate" ? "Answer Evaluator" : "Interview Sim"}
+              {mode === "evaluate" ? "Answer Evaluator" : mode === "interview" ? "Interview Sim" : "Performance Analytics"}
             </h2>
             
             <div className="h-6 w-[1.5px] bg-border-dim hidden md:block"></div>
@@ -275,6 +408,12 @@ export default function Dashboard() {
               >
                 Interview
               </button>
+              <button 
+                onClick={() => setMode("analytics")}
+                className={`px-6 py-2 rounded-lg font-micro transition-all ${mode === "analytics" ? 'bg-accent-primary/10 text-accent-primary border border-accent-primary/20' : 'text-text-dim hover:text-text-main'}`}
+              >
+                Analytics
+              </button>
             </div>
           </div>
 
@@ -290,7 +429,16 @@ export default function Dashboard() {
 
         <section className="p-8 lg:p-12 lg:px-[48px] relative z-10 max-w-7xl mx-auto w-full">
           <AnimatePresence mode="wait">
-            {mode === "evaluate" ? (
+            {mode === "analytics" ? (
+               <motion.div 
+                 key="analytics"
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 exit={{ opacity: 0, scale: 0.98 }}
+               >
+                 {renderAnalytics()}
+               </motion.div>
+            ) : mode === "evaluate" ? (
               <motion.div 
                 key="evaluate"
                 initial={{ opacity: 0, y: 10 }}
