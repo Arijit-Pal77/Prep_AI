@@ -6,6 +6,8 @@ import {
   Mic2, 
   User, 
   BrainCircuit, 
+  LineChart,
+  Activity,
   ArrowRight,
   Sparkles,
   LayoutDashboard,
@@ -49,6 +51,14 @@ export default function Welcome() {
       icon: <Mic2 className="w-8 h-8 text-accent-secondary" />,
       path: "/dashboard?mode=interview",
       color: "from-accent-secondary/20"
+    },
+    {
+      id: "analytics",
+      title: "Performance Analytics",
+      description: "Track your progress with data-driven insights, trend charts, and topic-specific mastery profiles.",
+      icon: <Activity className="w-8 h-8 text-emerald-400" />,
+      path: "/dashboard?mode=analytics",
+      color: "from-emerald-400/20"
     },
     {
       id: "profile",
@@ -116,7 +126,7 @@ export default function Welcome() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-8"
         >
           {features.map((feature) => (
             <motion.div 

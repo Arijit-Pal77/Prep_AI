@@ -24,6 +24,7 @@ async function setupDatabase() {
         type VARCHAR(50) NOT NULL,
         score INT NOT NULL,
         topic VARCHAR(255) NOT NULL,
+        details TEXT,
         date DATE NOT NULL,
         time TIME NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
