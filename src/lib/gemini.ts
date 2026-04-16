@@ -1,8 +1,25 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (aiInstance) return aiInstance;
+  
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    // We log the error but don't throw immediately at the top level to avoid blank pages
+    console.warn("GEMINI_API_KEY is missing. AI features will be unavailable.");
+    return null;
+  }
+  
+  aiInstance = new GoogleGenAI(apiKey);
+  return aiInstance;
+}
 
 export async function evaluateAnswer(answer: string) {
+  const ai = getAI();
+  if (!ai) throw new Error("AI Client not initialized. Please check your API key.");
+  
   const model = "gemini-3-flash-preview";
   const prompt = `
     You are an expert interviewer and communication coach.
@@ -31,6 +48,9 @@ export async function evaluateAnswer(answer: string) {
 }
 
 export async function getInterviewQuestion(topic: string, difficulty: string, history: string[] = []) {
+  const ai = getAI();
+  if (!ai) throw new Error("AI Client not initialized. Please check your API key.");
+  
   const model = "gemini-3-flash-preview";
   const prompt = `
     You are a professional technical and behavioral interviewer.
@@ -53,6 +73,9 @@ export async function getInterviewQuestion(topic: string, difficulty: string, hi
 }
 
 export async function evaluateInterviewTurn(answer: string, question: string) {
+  const ai = getAI();
+  if (!ai) throw new Error("AI Client not initialized. Please check your API key.");
+  
   const model = "gemini-3-flash-preview";
   const prompt = `
     Analyze the user's answer to the interview question below.
