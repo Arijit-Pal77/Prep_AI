@@ -6,7 +6,7 @@ import Profile from "./pages/Profile";
 import Welcome from "./pages/Welcome";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
-import { AnimatedBackground } from "./components/AnimatedBackground";
+import { ThreeBackground } from "./components/ThreeBackground";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("token");
@@ -51,7 +51,7 @@ export default function App() {
 
   return (
     <Router>
-      <AnimatedBackground />
+      <ThreeBackground />
       <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route 
