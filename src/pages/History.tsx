@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Filter,
   X,
-  AlertCircle
+  AlertCircle,
+  Menu
 } from "lucide-react";
 
 export default function HistoryPage() {
@@ -23,6 +24,7 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterType, setFilterType] = React.useState<string | null>(null);
   const [selectedSession, setSelectedSession] = React.useState<any>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const [history, setHistory] = React.useState(() => {
     const saved = JSON.parse(localStorage.getItem("app-sessions") || "[]");
@@ -47,7 +49,20 @@ export default function HistoryPage() {
   });
 
   return (
-    <div className="min-h-screen bg-bg-dark text-text-main font-sans flex overflow-hidden">
+    <div className="min-h-screen bg-bg-dark text-text-main font-sans flex overflow-hidden lg:overflow-visible">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Session Detail Modal */}
       <AnimatePresence>
         {selectedSession && (
@@ -113,12 +128,17 @@ export default function HistoryPage() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className="w-[240px] border-r border-border-dim bg-sidebar-bg/90 p-8 lg:flex flex-col hidden shrink-0 z-20">
-        <div className="flex items-center gap-3 mb-10 cursor-pointer" onClick={() => navigate("/welcome")}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center">
-            <BrainCircuit className="text-[#21008e] w-5 h-5" />
+      <aside className={`fixed inset-y-0 left-0 w-[240px] border-r border-border-dim bg-sidebar-bg/95 p-8 flex flex-col shrink-0 z-[50] transition-transform duration-300 transform lg:relative lg:translate-x-0 lg:bg-sidebar-bg/90 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/welcome")}>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center">
+              <BrainCircuit className="text-[#21008e] w-5 h-5" />
+            </div>
+            <h1 className="text-xl font-bold font-headline text-accent-secondary">PrepAI</h1>
           </div>
-          <h1 className="text-xl font-bold font-headline text-accent-secondary">PrepAI</h1>
+          <button className="lg:hidden p-2 text-text-dim" onClick={() => setIsSidebarOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -141,8 +161,16 @@ export default function HistoryPage() {
 
       {/* Main Content */}
       <main className="flex-1 relative flex flex-col h-screen">
-        <header className="h-20 border-b border-border-dim bg-bg-dark/40 backdrop-blur-xl flex items-center justify-between px-12 sticky top-0 z-30 shrink-0">
-          <h2 className="font-micro">Session History</h2>
+        <header className="h-20 border-b border-border-dim bg-bg-dark/40 backdrop-blur-xl flex items-center justify-between px-6 lg:px-12 sticky top-0 z-30 shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 text-text-dim hover:text-accent-primary transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+            <h2 className="font-micro">Session History</h2>
+          </div>
           <div className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full">
             <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
               {user?.username?.substring(0, 2).toUpperCase() || "AR"}
