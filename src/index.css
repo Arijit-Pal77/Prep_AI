@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-dark: #07070b;
+  --panel-bg: rgba(25, 25, 35, 0.7);
+  --sidebar-bg: #0a0a0f;
+  --accent-primary: #8b80ff;
+  --accent-secondary: #c6c0ff;
+  --text-main: #e3e0f8;
+  --text-dim: #94a3b8;
+  --border-dim: rgba(255, 255, 255, 0.08);
+  --font-sans-var: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-var: "Space Grotesk", sans-serif;
+}
+
+@theme {
+  --font-sans: var(--font-sans-var);
+  --font-headline: var(--font-headline-var);
+  
+  --color-bg-dark: var(--bg-dark);
+  --color-panel-bg: var(--panel-bg);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-text-main: var(--text-main);
+  --color-text-dim: var(--text-dim);
+  --color-border-dim: var(--border-dim);
+}
+
+@layer base {
+  body {
+    @apply bg-bg-dark text-text-main antialiased font-sans transition-colors duration-300;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline tracking-tighter;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+}
+
+.font-micro {
+  @apply text-[10px] uppercase font-bold tracking-[0.2em] text-text-dim;
+}
+
+.text-display {
+  @apply text-5xl lg:text-7xl font-bold tracking-tighter leading-[0.9] lg:leading-[0.85];
+}
+
+.glass-card {
+  @apply bg-panel-bg backdrop-blur-[10px] border border-border-dim rounded-[20px];
+}
+
+.btn-minimal {
+  @apply bg-accent-primary text-[#000] font-bold py-3 px-6 rounded-xl transition-all hover:opacity-90 active:scale-95;
+}
+
+.btn-minimal-outline {
+  @apply bg-transparent border border-accent-primary text-accent-primary font-bold py-3 px-6 rounded-xl transition-all hover:bg-accent-primary/10 active:scale-95;
+}
