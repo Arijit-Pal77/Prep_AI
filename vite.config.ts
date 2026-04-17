@@ -25,10 +25,13 @@ export default defineConfig(({mode}) => {
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             'vendor-ui': ['framer-motion', 'lucide-react', 'motion'],
+            'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+            'vendor-charts': ['recharts'],
+            'vendor-ai': ['@google/genai'],
           },
         },
       },
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 2000,
     },
   };
 });
