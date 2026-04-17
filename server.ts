@@ -214,6 +214,11 @@ async function startServer() {
     }
   });
 
+  // --- Health Check for Uptime Monitoring ---
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

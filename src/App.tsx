@@ -94,8 +94,8 @@ export default function App() {
             </PrivateRoute>
           } 
         />
-        <Route path="/" element={<Navigate to="/auth" />} />
-        <Route path="*" element={<Navigate to="/auth" />} />
+        <Route path="/" element={<Auth />} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );
