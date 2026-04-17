@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.'),
       },
     },
     server: {
@@ -20,17 +20,6 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
     },
     build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-ui': ['framer-motion', 'lucide-react', 'motion'],
-            'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
-            'vendor-charts': ['recharts'],
-            'vendor-ai': ['@google/genai'],
-          },
-        },
-      },
       chunkSizeWarningLimit: 2000,
     },
   };
