@@ -25,6 +25,8 @@ export default function Profile() {
         setUsername(data.username);
         setEmail(data.email);
       } else {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         navigate("/auth");
       }
     } catch (err) {
@@ -91,33 +93,10 @@ export default function Profile() {
         </div>
 
         <nav className="flex-1 space-y-2">
-          <button 
-            onClick={() => navigate("/dashboard")}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium text-[14px] text-text-dim hover:bg-white/5"
-          >
-            <LayoutDashboard size={18} />
-            <span>Dashboard</span>
-          </button>
-          <button 
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium text-[14px] bg-accent-primary/10 text-accent-primary"
-          >
-            <User size={18} />
-            <span>Profile</span>
-          </button>
-          <button 
-            onClick={() => navigate("/history")}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium text-[14px] text-text-dim hover:bg-white/5"
-          >
-            <History size={18} />
-            <span>History</span>
-          </button>
-          <button 
-            onClick={() => navigate("/settings")}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium text-[14px] text-text-dim hover:bg-white/5"
-          >
-            <Settings size={18} />
-            <span>Settings</span>
-          </button>
+          <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => navigate("/dashboard")} />
+          <NavItem icon={<User size={18}/>} label="Profile" active={true} />
+          <NavItem icon={<History size={18}/>} label="History" onClick={() => navigate("/history")} />
+          <NavItem icon={<Settings size={18}/>} label="Settings" onClick={() => navigate("/settings")} />
         </nav>
 
         <div className="pt-6 border-t border-border-dim mt-6">
@@ -142,11 +121,19 @@ export default function Profile() {
             </button>
             <h2 className="font-micro">Profile Settings</h2>
           </div>
-          <div className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full">
-            <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
-              {decodedUser?.username?.substring(0, 2).toUpperCase() || "AR"}
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full cursor-pointer hover:bg-panel-bg/80 transition-all" 
+              onClick={() => {
+                setIsSidebarOpen(false);
+                navigate("/profile");
+              }}
+            >
+              <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
+                {decodedUser?.username?.substring(0, 2).toUpperCase() || "AR"}
+              </div>
+              <span className="text-sm font-medium">{decodedUser?.username || "Unknown"}</span>
             </div>
-            <span className="text-sm font-medium">{decodedUser?.username || "Unknown"}</span>
           </div>
         </header>
 
@@ -229,5 +216,17 @@ export default function Profile() {
         </section>
       </main>
     </div>
+  );
+}
+
+function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium text-[14px] ${active ? 'bg-accent-primary/10 text-accent-primary' : 'text-text-dim hover:bg-white/5'}`}
+    >
+      <span className={`${active ? 'text-accent-primary' : 'text-text-dim'}`}>{icon}</span>
+      <span>{label}</span>
+    </button>
   );
 }

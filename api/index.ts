@@ -116,6 +116,18 @@ app.post("/api/sessions", authenticateToken, async (req: any, res) => {
   }
 });
 
+app.get("/api/sessions", authenticateToken, async (req: any, res) => {
+  try {
+    const [userSessions]: any = await pool.query(
+      "SELECT * FROM scores WHERE user_id = ? ORDER BY created_at DESC",
+      [req.user.id]
+    );
+    res.json(userSessions);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/api/stats", authenticateToken, async (req: any, res) => {
   try {
     const [userSessions]: any = await pool.query(
@@ -128,7 +140,8 @@ app.get("/api/stats", authenticateToken, async (req: any, res) => {
         overview: { totalAttempts: 0, avgScore: 0, recordHigh: 0, consistency: 0 },
         trend: [],
         topicAnalysis: [],
-        activityAnalysis: []
+        activityAnalysis: [],
+        recent: []
       });
     }
 
@@ -170,7 +183,8 @@ app.get("/api/stats", authenticateToken, async (req: any, res) => {
       overview: { totalAttempts, avgScore, recordHigh, consistency },
       trend,
       topicAnalysis,
-      activityAnalysis
+      activityAnalysis,
+      recent: userSessions.slice(0, 5)
     });
   } catch (err) {
     console.error("Stats error:", err);

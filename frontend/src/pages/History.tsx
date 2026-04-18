@@ -16,7 +16,9 @@ import {
   X,
   AlertCircle,
   Menu,
-  Trash2
+  Trash2,
+  BookOpen,
+  ScrollText
 } from "lucide-react";
 
 export default function HistoryPage() {
@@ -28,22 +30,55 @@ export default function HistoryPage() {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
-  const [history, setHistory] = React.useState(() => {
-    const saved = JSON.parse(localStorage.getItem("app-sessions") || "[]");
-    if (saved.length === 0 && localStorage.getItem("app-sessions") === null) {
-      return [
-        { id: 1, type: "Evaluator", date: "2026-04-15", time: "14:30", score: "85", topic: "Intro to React", details: "Score: 85\nStrength: Clear structure\nWeakness: Needs more technical depth\nIdeal Answer: React is a library for building user interfaces..." },
-        { id: 2, type: "Interview", date: "2026-04-14", time: "09:15", score: "72", topic: "Software Engineering", details: "Question: What is polymorphism?\nAnswer: It is many forms.\n\nFeedback: You should refine the definition with examples from OOP like method overriding." },
-        { id: 3, type: "Evaluator", date: "2026-04-12", time: "18:45", score: "91", topic: "Behavioral", details: "Score: 91\nStrength: Excellent STAR method usage\nWeakness: None noted\nIdeal Answer: Keep doing what you're doing." },
-        { id: 4, type: "Evaluator", date: "2026-04-10", time: "11:20", score: "64", topic: "Python Basics", details: "Score: 64\nStrength: Identified list vs tuple\nWeakness: Confused dictionary with sets\nIdeal Answer: Dictionaries are key-value pairs..." },
-      ];
-    }
-    return saved;
-  });
+  const [history, setHistory] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleDeleteAll = () => {
-    localStorage.setItem("app-sessions", JSON.stringify([]));
-    setHistory([]);
+  React.useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const resp = await fetch("/api/sessions", {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`
+          }
+        });
+        
+        if (resp.status === 401 || resp.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/auth");
+          return;
+        }
+
+        if (!resp.ok) throw new Error("Failed to fetch history");
+        const data = await resp.json();
+        setHistory(data);
+      } catch (err) {
+        console.error(err);
+        setError("Could not load your history. Please try again later.");
+        // Fallback to local storage if API fails or for offline feel
+        const saved = JSON.parse(localStorage.getItem("app-sessions") || "[]");
+        setHistory(saved);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  const handleDeleteAll = async () => {
+    try {
+      await fetch("/api/sessions", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      localStorage.setItem("app-sessions", JSON.stringify([]));
+      setHistory([]);
+    } catch (err) {
+      console.error(err);
+    }
     setShowDeleteConfirm(false);
   };
 
@@ -119,8 +154,16 @@ export default function HistoryPage() {
             >
               <div className="p-6 border-b border-border-dim flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedSession.type === 'Evaluator' ? 'bg-accent-primary/10 text-accent-primary' : 'bg-accent-secondary/10 text-accent-secondary'}`}>
-                    {selectedSession.type === 'Evaluator' ? <LayoutDashboard size={20} /> : <History size={20} />}
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    selectedSession.type === 'Evaluator' ? 'bg-accent-primary/10 text-accent-primary' : 
+                    selectedSession.type === 'Interview' ? 'bg-accent-secondary/10 text-accent-secondary' :
+                    selectedSession.type === 'Explainer' ? 'bg-emerald-500/10 text-emerald-500' :
+                    'bg-amber-500/10 text-amber-500'
+                  }`}>
+                    {selectedSession.type === 'Evaluator' ? <LayoutDashboard size={20} /> : 
+                     selectedSession.type === 'Interview' ? <History size={20} /> :
+                     selectedSession.type === 'Explainer' ? <BookOpen size={20} /> :
+                     <ScrollText size={20} />}
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-text-main">{selectedSession.topic}</h3>
@@ -137,8 +180,12 @@ export default function HistoryPage() {
 
               <div className="flex-1 p-8 overflow-y-auto space-y-8">
                 <div className="flex items-end gap-4">
-                  <div className="text-5xl font-bold font-headline text-text-main">{selectedSession.score}%</div>
-                  <div className="font-micro text-emerald-400 pb-1">Mastery Score</div>
+                  <div className="text-5xl font-bold font-headline text-text-main">
+                    {selectedSession.type === 'Explainer' || selectedSession.type === 'Syllabus' ? "GEN" : `${selectedSession.score}%`}
+                  </div>
+                  <div className="font-micro text-emerald-400 pb-1">
+                    {selectedSession.type === 'Explainer' || selectedSession.type === 'Syllabus' ? "Generated Content" : "Mastery Score"}
+                  </div>
                 </div>
 
                 <div className="space-y-6">
@@ -186,10 +233,10 @@ export default function HistoryPage() {
         </div>
 
         <nav className="flex-1 space-y-2">
-          <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon={<User size={18}/>} label="Profile" onClick={() => navigate("/profile")} />
+          <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => { setIsSidebarOpen(false); navigate("/dashboard"); }} />
+          <NavItem icon={<User size={18}/>} label="Profile" onClick={() => { setIsSidebarOpen(false); navigate("/profile"); }} />
           <NavItem icon={<History size={18}/>} label="History" active={true} />
-          <NavItem icon={<Settings size={18}/>} label="Settings" onClick={() => navigate("/settings")} />
+          <NavItem icon={<Settings size={18}/>} label="Settings" onClick={() => { setIsSidebarOpen(false); navigate("/settings"); }} />
         </nav>
 
         <div className="pt-6 border-t border-border-dim mt-6">
@@ -215,11 +262,19 @@ export default function HistoryPage() {
             </button>
             <h2 className="font-micro">Session History</h2>
           </div>
-          <div className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full">
-            <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
-              {user?.username?.substring(0, 2).toUpperCase() || "AR"}
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full cursor-pointer hover:bg-panel-bg/80 transition-all" 
+              onClick={() => {
+                setIsSidebarOpen(false);
+                navigate("/profile");
+              }}
+            >
+              <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
+                {user?.username?.substring(0, 2).toUpperCase() || "AR"}
+              </div>
+              <span className="text-sm font-medium">{user?.username || "Unknown"}</span>
             </div>
-            <span className="text-sm font-medium">{user?.username || "Unknown"}</span>
           </div>
         </header>
 
@@ -251,8 +306,10 @@ export default function HistoryPage() {
                   </button>
                   <div className="absolute right-0 mt-2 w-40 bg-sidebar-bg border border-border-dim rounded-xl hidden group-hover:block z-50 p-2 shadow-2xl">
                     <button onClick={() => setFilterType(null)} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">All Types</button>
-                    <button onClick={() => setFilterType("Evaluator")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Evaluator</button>
-                    <button onClick={() => setFilterType("Interview")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Interview</button>
+                    <button onClick={() => setFilterType("Evaluator")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Evaluators</button>
+                    <button onClick={() => setFilterType("Interview")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Interviews</button>
+                    <button onClick={() => setFilterType("Explainer")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Explainers</button>
+                    <button onClick={() => setFilterType("Syllabus")} className="w-full text-left px-3 py-2 text-xs font-micro hover:bg-white/5 rounded-lg">Syllabus Plans</button>
                   </div>
                 </div>
 
@@ -279,8 +336,16 @@ export default function HistoryPage() {
                   className="glass-card p-6 flex items-center justify-between group cursor-pointer"
                 >
                   <div className="flex items-center gap-6">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${item.type === 'Evaluator' ? 'bg-accent-primary/10 text-accent-primary' : 'bg-accent-secondary/10 text-accent-secondary'}`}>
-                      {item.type === 'Evaluator' ? <LayoutDashboard size={20} /> : <InterviewIcon size={20} />}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
+                      item.type === 'Evaluator' ? 'bg-accent-primary/10 text-accent-primary' : 
+                      item.type === 'Interview' ? 'bg-accent-secondary/10 text-accent-secondary' :
+                      item.type === 'Explainer' ? 'bg-emerald-500/10 text-emerald-500' :
+                      'bg-amber-500/10 text-amber-500'
+                    }`}>
+                      {item.type === 'Evaluator' ? <LayoutDashboard size={20} /> : 
+                       item.type === 'Interview' ? <History size={20} /> :
+                       item.type === 'Explainer' ? <BookOpen size={20} /> :
+                       <ScrollText size={20} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-1">
@@ -298,8 +363,12 @@ export default function HistoryPage() {
 
                   <div className="flex items-center gap-8">
                     <div className="text-right">
-                      <div className="text-xl font-bold font-headline text-text-main">{item.score}%</div>
-                      <div className="font-micro text-emerald-400">Score</div>
+                      <div className="text-xl font-bold font-headline text-text-main">
+                        {item.type === 'Explainer' || item.type === 'Syllabus' ? "GEN" : `${item.score}%`}
+                      </div>
+                      <div className="font-micro text-emerald-400">
+                        {item.type === 'Explainer' || item.type === 'Syllabus' ? "Result" : "Score"}
+                      </div>
                     </div>
                     <ChevronRight className="text-text-dim group-hover:text-accent-primary transition-all" size={18} />
                   </div>

@@ -239,9 +239,9 @@ export default function SettingsPage() {
                <div className="flex items-start gap-4">
                  <Sparkles className="text-accent-primary shrink-0" size={20} />
                  <div>
-                   <h5 className="text-sm font-bold text-text-main mb-2">◆ Arijit</h5>
+                   <h5 className="text-sm font-bold text-text-main mb-2">Live Theme Injection</h5>
                    <p className="text-xs text-text-dim leading-relaxed">
-                     designing logic · crafting systems · evolving self
+                     Theme properties are injected into the CSS Object Model in real-time. Changes are persistent across page refreshes and active sessions.
                    </p>
                  </div>
                </div>
@@ -387,9 +387,9 @@ export default function SettingsPage() {
         </div>
 
         <nav className="flex-1 space-y-2">
-          <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => navigate("/dashboard")} />
-          <NavItem icon={<User size={18}/>} label="Profile" onClick={() => navigate("/profile")} />
-          <NavItem icon={<History size={18}/>} label="History" onClick={() => navigate("/history")} />
+          <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" onClick={() => { setIsSidebarOpen(false); navigate("/dashboard"); }} />
+          <NavItem icon={<User size={18}/>} label="Profile" onClick={() => { setIsSidebarOpen(false); navigate("/profile"); }} />
+          <NavItem icon={<History size={18}/>} label="History" onClick={() => { setIsSidebarOpen(false); navigate("/history"); }} />
           <NavItem icon={<Settings size={18}/>} label="Settings" active={true} />
         </nav>
 
@@ -424,11 +424,19 @@ export default function SettingsPage() {
              )}
              <h2 className="font-micro">System Console</h2>
           </div>
-          <div className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full">
-            <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
-              {user?.username?.substring(0, 2).toUpperCase() || "AR"}
+          <div className="flex items-center gap-4">
+            <div 
+              className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full cursor-pointer hover:bg-panel-bg/80 transition-all" 
+              onClick={() => { 
+                setIsSidebarOpen(false); 
+                navigate("/profile"); 
+              }}
+            >
+              <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
+                {user?.username?.substring(0, 2).toUpperCase() || "AR"}
+              </div>
+              <span className="text-sm font-medium">{user?.username || "Unknown"}</span>
             </div>
-            <span className="text-sm font-medium">{user?.username || "Unknown"}</span>
           </div>
         </header>
 

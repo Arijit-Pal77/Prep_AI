@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx api/index.ts",
+    "dev:json": "tsx server.ts",
     "build": "vite build frontend --outDir ../dist",
     "preview": "vite preview frontend",
     "clean": "rm -rf dist",

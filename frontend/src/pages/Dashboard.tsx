@@ -35,6 +35,7 @@ import {
   Map as MapIcon,
   Layers,
   Clock,
+  ScrollText,
   Copy,
   Check
 } from "lucide-react";
@@ -131,6 +132,14 @@ export default function Dashboard() {
       const res = await fetch("/api/stats", {
         headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
       });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        navigate("/auth");
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -148,15 +157,20 @@ export default function Dashboard() {
     navigate("/auth");
   };
 
-  const saveSession = async (type: "evaluate" | "interview", topic: string, score: number, details: string) => {
+  const saveSession = async (type: "evaluate" | "interview" | "explainer" | "syllabus", topic: string, score: number, details: string) => {
     // Save to LocalStorage for offline/immediate view
     const sessions = JSON.parse(localStorage.getItem("app-sessions") || "[]");
     const date = new Date().toISOString().split('T')[0];
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     
+    let displayType = "Evaluator";
+    if (type === "interview") displayType = "Interview";
+    if (type === "explainer") displayType = "Explainer";
+    if (type === "syllabus") displayType = "Syllabus";
+
     const newSessionLocal = {
       id: Date.now(),
-      type: type === "evaluate" ? "Evaluator" : "Interview",
+      type: displayType,
       topic: topic,
       score: score.toString(),
       details: details,
@@ -174,7 +188,7 @@ export default function Dashboard() {
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
         body: JSON.stringify({
-          type: type === "evaluate" ? "Evaluator" : "Interview",
+          type: displayType,
           topic,
           score,
           details,
@@ -285,126 +299,132 @@ export default function Dashboard() {
   const exportToPDF = async (elementRef: React.RefObject<HTMLDivElement>, fileName: string, titleStr: string) => {
     if (!elementRef.current) return;
     
-    setDownloadState({ active: true, progress: 10, message: "Preparing document structure..." });
+    setDownloadState({ active: true, progress: 10, message: "Initializing professional vector engine..." });
     
     try {
-      const element = elementRef.current;
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      let currentY = 30;
+      let pageNum = 1;
 
-      // --- 1. COVER PAGE ---
-      setDownloadState(prev => ({ ...prev, progress: 25, message: "Generating premium cover page..." }));
-      
-      const coverContainer = document.createElement('div');
-      coverContainer.style.cssText = `
-        position: absolute; left: -9999px; width: 800px; height: 1131px; 
-        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-        color: white; padding: 100px 60px; display: flex; flex-direction: column; justify-content: space-between;
-        font-family: sans-serif;
-      `;
-      
-      coverContainer.innerHTML = `
-        <div style="border-left: 4px solid #b18fff; padding-left: 30px;">
-          <h1 style="font-size: 64px; margin: 0; color: #b18fff; letter-spacing: -2px;">PrepAI</h1>
-          <p style="font-size: 20px; text-transform: uppercase; letter-spacing: 4px; opacity: 0.6; margin: 10px 0 0 0;">Smart Study Report</p>
-        </div>
+      const drawPageFrame = (num: number) => {
+        // Decorative border lines (Technical look)
+        pdf.setDrawColor(200);
+        pdf.setLineWidth(0.1);
+        pdf.line(margin - 5, 10, margin - 5, pageHeight - 10); // Left accent line
         
-        <div>
-          <h2 style="font-size: 42px; line-height: 1.2; margin-bottom: 20px;">${titleStr}</h2>
-          <div style="width: 100px; height: 4px; background: #b18fff; margin-bottom: 40px;"></div>
-          <p style="font-size: 18px; opacity: 0.8;">Report ID: #${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
-          <p style="font-size: 18px; opacity: 0.8;">Generated for: ${user?.username || "Premium Scholar"}</p>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); pt: 40px;">
-          <div>
-            <p style="font-size: 14px; opacity: 0.5;">Date generated</p>
-            <p style="font-size: 18px; font-weight: bold;">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-          </div>
-          <div style="text-align: right;">
-            <p style="font-size: 12px; opacity: 0.4;">© 2026 PrepAI Academic Systems</p>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(coverContainer);
-      const coverCanvas = await html2canvas(coverContainer, { scale: 2 });
-      document.body.removeChild(coverContainer);
-      
-      pdf.addImage(coverCanvas.toDataURL('image/jpeg', 0.8), 'JPEG', 0, 0, pageWidth, pageHeight);
-      
-      // --- 2. CONTENT PAGES ---
-      setDownloadState(prev => ({ ...prev, progress: 50, message: "Capturing structured content..." }));
-      
-      const printContainer = document.createElement('div');
-      printContainer.style.cssText = `
-        position: absolute; left: -9999px; top: 0; width: 800px; 
-        background: white; color: black; padding: 60px 50px;
-        font-family: sans-serif;
-      `;
-      
-      printContainer.innerHTML = `
-        <div style="margin-bottom: 40px; border-bottom: 1px solid #ddd; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-weight: bold; color: #6366f1;">PrepAI Academic Archive</span>
-          <span style="font-size: 12px; color: #999;">${titleStr}</span>
-        </div>
-        <div class="content-body" style="line-height: 1.6;">
-          ${element.innerHTML}
-        </div>
-      `;
-
-      // Apply consistent styling to print output
-      const styles = printContainer.querySelectorAll('h1, h2, h3, h4, p, li, strong');
-      styles.forEach((el: any) => {
-        el.style.color = '#1f2937';
-        if (el.tagName.startsWith('H')) el.style.color = '#111827';
-        if (el.tagName === 'STRONG') el.style.color = '#4f46e5';
-      });
-
-      document.body.appendChild(printContainer);
-      const contentCanvas = await html2canvas(printContainer, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        windowWidth: 800
-      });
-      document.body.removeChild(printContainer);
-
-      setDownloadState(prev => ({ ...prev, progress: 80, message: "Building final PDF strategy..." }));
-
-      const imgData = contentCanvas.toDataURL('image/jpeg', 0.85);
-      const imgWidth = 190;
-      const imgHeight = (contentCanvas.height * imgWidth) / contentCanvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 15;
-
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - 30);
-
-      let pNum = 2;
-      while (heightLeft >= 0) {
-        position = (heightLeft - imgHeight) + 15;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
-        
-        // Add footer with page number
+        pdf.setFont("helvetica", "bold");
         pdf.setFontSize(8);
-        pdf.setTextColor(150);
-        pdf.text(`Page ${pNum} | Generated for ${user?.username || "Scholar"}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        pdf.setTextColor(140);
+        pdf.text('PREPAI ACADEMIC REPORT', margin, 15);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`REF: #${Math.random().toString(36).substr(2, 6).toUpperCase()}`, margin + 50, 15);
+        pdf.text(`PAGE ${num}`, pageWidth - margin, 15, { align: 'right' });
         
-        heightLeft -= (pageHeight - 30);
-        pNum++;
+        pdf.setDrawColor(100);
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, 18, pageWidth - margin, 18);
+      };
+
+      drawPageFrame(pageNum);
+
+      // Title Section
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(20);
+      const titleLines = pdf.splitTextToSize(titleStr, contentWidth);
+      pdf.text(titleLines, margin, currentY);
+      currentY += (titleLines.length * 10) + 12;
+
+      const renderNode = (node: Element, level = 0) => {
+        const tag = node.tagName.toLowerCase();
+        let fontSize = 10;
+        let fontStyle = "normal";
+        let spacingAfter = 5;
+        let prefix = "";
+        let textColor = [50, 50, 50]; 
+
+        if (tag.startsWith('h')) {
+          fontSize = tag === 'h1' ? 14 : tag === 'h2' ? 12 : 11;
+          fontStyle = "bold";
+          spacingAfter = 6;
+          textColor = [0, 0, 0];
+          // Add a small spacer line before headers
+          if (currentY > 40) {
+            pdf.setDrawColor(230);
+            pdf.line(margin + (level * 8), currentY - 2, margin + (level * 8) + 20, currentY - 2);
+          }
+        } else if (tag === 'li') {
+          prefix = "- "; // Using standard hyphen for maximum compatibility
+          spacingAfter = 3;
+        }
+
+        // Clean text of characters that break standard PDF encoding
+        let text = node.textContent?.trim() || "";
+        if (!text) return;
+        
+        // Clean symbols to safe ASCII equivalents for high quality rendering
+        text = text
+          .replace(/→|->/g, ">>") // Double arrow for "next"
+          .replace(/•|◦/g, "-")   // Safe bullets
+          .replace(/[^\x00-\x7F]/g, ""); // Stripping any remaining non-ASCII to prevent artifacts like %ae
+
+        pdf.setFont("helvetica", fontStyle);
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+
+        const lines = pdf.splitTextToSize(prefix + text, contentWidth - (level * 8));
+        const lineHeightMm = (fontSize * 1.4) * 0.3527; 
+        const totalHeight = lines.length * lineHeightMm;
+
+        // Smart page break
+        if (currentY + totalHeight > pageHeight - 25) {
+          pdf.addPage();
+          pageNum++;
+          drawPageFrame(pageNum);
+          currentY = 30;
+          pdf.setFont("helvetica", fontStyle);
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+        }
+
+        pdf.text(lines, margin + (level * 8), currentY);
+        currentY += totalHeight + spacingAfter;
+      };
+
+      const items = Array.from(elementRef.current.querySelectorAll('h1, h2, h3, p, li'));
+      
+      items.forEach((child, index) => {
+        const isLi = child.tagName.toLowerCase() === 'li';
+        renderNode(child, isLi ? 1 : 0);
+        
+        const progress = 10 + Math.floor((index / items.length) * 80);
+        setDownloadState(prev => ({ ...prev, progress, message: `Vectorizing block ${index + 1}...` }));
+      });
+
+      // ADD FOOTER / CERTIFICATION
+      if (currentY + 20 < pageHeight - 20) {
+        currentY += 10;
+        pdf.setDrawColor(240);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, currentY, pageWidth - margin, currentY);
+        currentY += 8;
+        pdf.setFont("helvetica", "italic");
+        pdf.setFontSize(7);
+        pdf.setTextColor(180);
+        pdf.text('This document was digitally prepared by PrepAI Adaptive Systems.', margin, currentY);
+        pdf.text(`TS: ${new Date().toISOString()}`, pageWidth - margin, currentY, { align: 'right' });
       }
 
-      setDownloadState(prev => ({ ...prev, progress: 100, message: "Document ready!" }));
+      setDownloadState({ active: true, progress: 100, message: "Finalizing high-fidelity report..." });
       
       setTimeout(() => {
         pdf.save(`${fileName}.pdf`);
         setDownloadState({ active: false, progress: 0, message: "" });
-      }, 800);
+      }, 500);
 
     } catch (error) {
       console.error('PDF Export Error:', error);
@@ -424,6 +444,9 @@ export default function Dashboard() {
     try {
       const resp = await generateSyllabusPlan(syllabusContent, syllabusSubject, syllabusDate);
       setSyllabusResult(resp || "No plan generated");
+      if (resp) {
+        saveSession("syllabus", syllabusSubject || "Syllabus Strategy", 0, resp);
+      }
     } catch (err) {
       console.error(err);
       setSyllabusResult("Error generating plan. Please check your connection.");
@@ -438,6 +461,9 @@ export default function Dashboard() {
     try {
       const resp = await generateExplanation(explainerContent, explainerLang, explainerMode);
       setExplainerResult(resp || "No analysis found");
+      if (resp) {
+        saveSession("explainer", explainerContent.substring(0, 30) + "...", 0, resp);
+      }
     } catch (err) {
       console.error(err);
       setExplainerResult("Error generating explanation. Please check your connection.");
@@ -933,6 +959,59 @@ export default function Dashboard() {
             <TopicAnalysisChart data={stats.topicAnalysis} />
           </div>
         </div>
+
+        {/* History Box - Recent Activity */}
+        <div className="glass-card p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-bold font-headline flex items-center gap-2">
+              <History className="text-accent-primary" size={20} />
+              Recent Activity
+            </h3>
+            <button 
+              onClick={() => navigate("/history")}
+              className="font-micro text-xs text-accent-primary hover:underline underline-offset-4"
+            >
+              View Full History
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3">
+            {stats.recent?.length > 0 ? stats.recent.map((item: any) => (
+              <div 
+                key={item.id}
+                className="flex items-center justify-between p-4 bg-black/20 border border-border-dim rounded-xl hover:bg-white/5 transition-all cursor-pointer group"
+                onClick={() => navigate("/history")}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    item.type === 'Evaluator' ? 'bg-accent-primary/10 text-accent-primary' : 
+                    item.type === 'Interview' ? 'bg-accent-secondary/10 text-accent-secondary' :
+                    item.type === 'Explainer' ? 'bg-emerald-500/10 text-emerald-500' :
+                    'bg-amber-500/10 text-amber-500'
+                  }`}>
+                    {item.type === 'Evaluator' ? <LayoutDashboard size={18} /> : 
+                     item.type === 'Interview' ? <History size={18} /> :
+                     item.type === 'Explainer' ? <BookOpen size={18} /> :
+                     <ScrollText size={18} />}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-text-main group-hover:text-accent-primary transition-colors">{item.topic}</h4>
+                    <p className="font-micro text-[10px] opacity-50">{item.date} • {item.type}</p>
+                  </div>
+                </div>
+                <div className="text-right flex items-center gap-4">
+                  <div className="font-headline text-lg font-bold text-text-main">
+                    {item.type === 'Explainer' || item.type === 'Syllabus' ? "GEN" : `${item.score}%`}
+                  </div>
+                  <ChevronRight size={16} className="text-text-dim group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            )) : (
+              <div className="text-center py-10 opacity-40 italic font-micro border border-dashed border-border-dim rounded-xl">
+                No recent activity recorded
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1035,17 +1114,17 @@ export default function Dashboard() {
           <NavItem 
             icon={<User size={18}/>} 
             label="Profile" 
-            onClick={() => navigate("/profile")}
+            onClick={() => { setIsSidebarOpen(false); navigate("/profile"); }}
           />
           <NavItem 
             icon={<History size={18}/>} 
             label="History" 
-            onClick={() => navigate("/history")}
+            onClick={() => { setIsSidebarOpen(false); navigate("/history"); }}
           />
           <NavItem 
             icon={<Settings size={18}/>} 
             label="Settings" 
-            onClick={() => navigate("/settings")}
+            onClick={() => { setIsSidebarOpen(false); navigate("/settings"); }}
           />
         </nav>
 
@@ -1122,7 +1201,13 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full cursor-pointer hover:bg-panel-bg/80 transition-all" onClick={() => navigate("/profile")}>
+            <div 
+              className="flex items-center gap-3 px-4 py-1.5 bg-panel-bg border border-border-dim rounded-full cursor-pointer hover:bg-panel-bg/80 transition-all" 
+              onClick={() => { 
+                setIsSidebarOpen(false); 
+                navigate("/profile"); 
+              }}
+            >
               <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs border-2 border-accent-primary">
                 {user?.username?.substring(0, 2).toUpperCase() || "AR"}
               </div>
@@ -1136,36 +1221,40 @@ export default function Dashboard() {
             {mode === "analytics" ? (
                <motion.div 
                  key="analytics"
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, scale: 0.98 }}
+                 initial={{ opacity: 0, x: 20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 exit={{ opacity: 0, x: -20 }}
+                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
                >
                  {renderAnalytics()}
                </motion.div>
             ) : mode === "explainer" ? (
               <motion.div 
                 key="explainer"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
               >
                 {renderExplainer()}
               </motion.div>
             ) : mode === "syllabus" ? (
               <motion.div 
                 key="syllabus"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
               >
                 {renderSyllabusNavigator()}
               </motion.div>
             ) : mode === "evaluate" ? (
               <motion.div 
                 key="evaluate"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
                 className="grid grid-cols-1 lg:grid-cols-3 gap-6"
               >
                 <div className="lg:col-span-3">
@@ -1256,9 +1345,10 @@ export default function Dashboard() {
             ) : (
               <motion.div 
                 key="interview"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
                 className="max-w-4xl mx-auto space-y-6"
               >
                 {!interviewState.running ? (
