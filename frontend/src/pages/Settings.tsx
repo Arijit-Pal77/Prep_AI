@@ -217,6 +217,9 @@ export default function SettingsPage() {
                     { id: "grid", label: "System Matrix", icon: <Globe size={14} /> },
                     { id: "shapes", label: "Geometry", icon: <Rocket size={14} /> },
                     { id: "abstract", label: "Deep Void", icon: <Shield size={14} /> },
+                    { id: "nebula", label: "Nebula Fusion", icon: <Sparkles size={14} /> },
+                    { id: "solar", label: "Solar System", icon: <Globe size={14} /> },
+                    { id: "glass", label: "Glass Orbs", icon: <User size={14} /> },
                     { id: "none", label: "Off", icon: <X size={14} /> }
                   ].map(b => (
                     <button
