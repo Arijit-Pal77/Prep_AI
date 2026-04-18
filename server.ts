@@ -5,20 +5,69 @@ import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
-import pool from "./src/lib/db.js";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const JWT_SECRET = process.env.JWT_SECRET || "prep-ai-secret-key-2024";
 const DB_PATH = path.join(__dirname, "data", "users.json");
+const SESSIONS_PATH = path.join(__dirname, "data", "sessions.json");
+
+// Ensure data directory exists
+async function ensureDb() {
+  const dataDir = path.join(__dirname, "data");
+  try {
+    await fs.access(dataDir);
+  } catch {
+    await fs.mkdir(dataDir);
+  }
+  try {
+    await fs.access(DB_PATH);
+  } catch {
+    await fs.writeFile(DB_PATH, JSON.stringify([]));
+  }
+  try {
+    await fs.access(SESSIONS_PATH);
+  } catch {
+    await fs.writeFile(SESSIONS_PATH, JSON.stringify([]));
+  }
+}
+
+async function getSessions() {
+  const data = await fs.readFile(SESSIONS_PATH, "utf-8");
+  return JSON.parse(data);
+}
+
+async function saveSessions(sessions: any[]) {
+  await fs.writeFile(SESSIONS_PATH, JSON.stringify(sessions, null, 2));
+}
+
+async function getUsers() {
+  const data = await fs.readFile(DB_PATH, "utf-8");
+  return JSON.parse(data);
+}
+
+async function saveUsers(users: any[]) {
+  await fs.writeFile(DB_PATH, JSON.stringify(users, null, 2));
+}
 
 async function startServer() {
+  await ensureDb();
   const app = express();
   app.use(express.json());
+
+  // Middleware to verify JWT
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+    
+    const token = authHeader.split(" ")[1];
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.status(403).json({ error: "Forbidden" });
+      req.user = user;
+      next();
+    });
+  };
 
   // --- Auth Routes ---
   app.post("/auth/signup", async (req, res) => {
@@ -27,196 +76,170 @@ async function startServer() {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    try {
-      const [existingUsers]: any = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-      if (existingUsers.length > 0) {
-        return res.status(400).json({ error: "User already exists" });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const id = Date.now().toString();
-      
-      await pool.query(
-        "INSERT INTO users (id, username, email, password) VALUES (?, ?, ?, ?)",
-        [id, username, email, hashedPassword]
-      );
-
-      res.json({ success: true, message: "User created successfully" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Internal server error" });
+    const users = await getUsers();
+    if (users.find((u: any) => u.email === email)) {
+      return res.status(400).json({ error: "User already exists" });
     }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      id: Date.now().toString(),
+      username,
+      email,
+      password: hashedPassword,
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    await saveUsers(users);
+
+    res.json({ success: true, message: "User created successfully" });
   });
 
   app.post("/auth/login", async (req, res) => {
     const { email, password } = req.body;
-    
-    try {
-      const [users]: any = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-      const user = users[0];
+    const users = await getUsers();
+    const user = users.find((u: any) => u.email === email);
 
-      if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, JWT_SECRET, {
-        expiresIn: "24h"
-      });
-
-      res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Internal server error" });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
+
+    const token = jwt.sign({ id: user.id, email: user.email, username: user.username }, JWT_SECRET, {
+      expiresIn: "24h"
+    });
+
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
   });
 
   // --- Profile Routes ---
-  app.get("/api/profile", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-
+  app.get("/api/profile", authenticateToken, async (req: any, res) => {
     try {
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
-      const [users]: any = await pool.query("SELECT * FROM users WHERE id = ?", [decoded.id]);
-      const user = users[0];
+      const users = await getUsers();
+      const user = users.find((u: any) => u.id === req.user.id);
       
       if (!user) return res.status(404).json({ error: "User not found" });
 
       const { password, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
-      res.status(401).json({ error: "Invalid token" });
+      res.status(500).json({ error: "Server error" });
     }
   });
 
-  app.put("/api/profile", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-
+  app.put("/api/profile", authenticateToken, async (req: any, res) => {
     try {
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
       const { username, email } = req.body;
+      const users = await getUsers();
+      const userIndex = users.findIndex((u: any) => u.id === req.user.id);
+      
+      if (userIndex === -1) return res.status(404).json({ error: "User not found" });
 
-      await pool.query(
-        "UPDATE users SET username = ?, email = ? WHERE id = ?",
-        [username, email, decoded.id]
-      );
+      users[userIndex] = { ...users[userIndex], username, email };
+      await saveUsers(users);
 
       res.json({ success: true, user: { username, email } });
     } catch (err) {
-      res.status(401).json({ error: "Invalid token" });
+      res.status(500).json({ error: "Server error" });
     }
   });
 
-  // --- History/Sessions Routes ---
-  app.get("/api/history", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-
+  // --- Session & Stats Routes ---
+  app.post("/api/sessions", authenticateToken, async (req: any, res) => {
     try {
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
-      const [history]: any = await pool.query(
-        "SELECT * FROM scores WHERE user_id = ? ORDER BY created_at DESC",
-        [decoded.id]
-      );
-      res.json(history);
+      const { type, topic, score, details, date, time } = req.body;
+      const sessions = await getSessions();
+      
+      const newSession = {
+        id: Date.now(),
+        userId: req.user.id,
+        type, // Evaluator or Interview
+        topic,
+        score: parseInt(score),
+        details,
+        date,
+        time,
+        createdAt: new Date().toISOString()
+      };
+      
+      sessions.push(newSession);
+      await saveSessions(sessions);
+      res.json({ success: true, session: newSession });
     } catch (err) {
-      res.status(401).json({ error: "Invalid token" });
+      res.status(500).json({ error: "Server error" });
     }
   });
 
-  // Alias for legacy support and new detailed history
-  app.post(["/api/history", "/api/sessions"], async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
-
+  app.get("/api/stats", authenticateToken, async (req: any, res) => {
     try {
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
-      const { type, score, topic, details, date, time } = req.body;
+      const allSessions = await getSessions();
+      const userSessions = allSessions.filter((s: any) => s.userId === req.user.id);
+      
+      if (userSessions.length === 0) {
+        return res.json({
+          overview: { totalAttempts: 0, avgScore: 0, recordHigh: 0, consistency: 0 },
+          trend: [],
+          topicAnalysis: [],
+          activityAnalysis: []
+        });
+      }
 
-      const finalDate = date || new Date().toISOString().split("T")[0];
-      const finalTime = time || new Date().toTimeString().split(" ")[0];
+      // Overview
+      const scores = userSessions.map((s: any) => s.score);
+      const totalAttempts = userSessions.length;
+      const avgScore = Math.round(scores.reduce((a: number, b: number) => a + b, 0) / totalAttempts);
+      const recordHigh = Math.max(...scores);
+      
+      // Consistency (Simplified: Standard Deviation approximation or just % above 70)
+      const consistency = Math.round((scores.filter((s: number) => s >= 70).length / totalAttempts) * 100);
 
-      await pool.query(
-        "INSERT INTO scores (user_id, type, score, topic, details, date, time) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [decoded.id, type, score, topic, details || "", finalDate, finalTime]
-      );
+      // Trend Analysis (Last 30)
+      const trend = userSessions
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .slice(-30)
+        .map((s: any) => ({
+          score: s.score,
+          date: s.date
+        }));
 
-      res.json({ success: true });
-    } catch (err) {
-      console.error("Error saving session:", err);
-      res.status(500).json({ error: "Failed to save session" });
-    }
-  });
+      // Topic Analysis
+      const topicsMap = userSessions.reduce((acc: any, s: any) => {
+        if (!acc[s.topic]) acc[s.topic] = { totalScore: 0, count: 0 };
+        acc[s.topic].totalScore += s.score;
+        acc[s.topic].count += 1;
+        return acc;
+      }, {});
 
-  // Analytics Stats Endpoint
-  app.get("/api/stats", async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+      const topicAnalysis = Object.entries(topicsMap).map(([topic, data]: [string, any]) => ({
+        topic,
+        avgScore: Math.round(data.totalScore / data.count)
+      })).sort((a, b) => b.avgScore - a.avgScore);
 
-    try {
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
-      const userId = decoded.id;
-
-      // 1. Overview Stats
-      const [overview]: any = await pool.query(
-        `SELECT 
-            COUNT(*) as totalAttempts,
-            COALESCE(ROUND(AVG(score)), 0) as avgScore,
-            COALESCE(MAX(score), 0) as recordHigh
-         FROM scores WHERE user_id = ?`,
-        [userId]
-      );
-
-      // 2. Trend Data (Last 30 sessions)
-      const [trend]: any = await pool.query(
-        `SELECT score, date 
-         FROM (
-           SELECT score, date, created_at 
-           FROM scores 
-           WHERE user_id = ? 
-           ORDER BY created_at DESC 
-           LIMIT 30
-         ) sub 
-         ORDER BY created_at ASC`,
-        [userId]
-      );
-
-      // 3. Topic Analysis
-      const [topicAnalysis]: any = await pool.query(
-        `SELECT topic, ROUND(AVG(score)) as avgScore, COUNT(*) as count
-         FROM scores 
-         WHERE user_id = ? 
-         GROUP BY topic 
-         ORDER BY avgScore DESC`,
-        [userId]
-      );
-
-      // Consistency calculation (simple logic based on frequency of scores in last 7 entries)
-      const consistency = trend.length > 5 ? 85 : 40; // Placeholder for now
+      const activityAnalysis = Object.entries(topicsMap).map(([topic, data]: [string, any]) => ({
+        topic,
+        count: data.count
+      })).sort((a, b) => b.count - a.count);
 
       res.json({
-        overview: {
-          ...overview[0],
-          consistency
-        },
+        overview: { totalAttempts, avgScore, recordHigh, consistency },
         trend,
-        topicAnalysis
+        topicAnalysis,
+        activityAnalysis
       });
     } catch (err) {
-      console.error("Error fetching stats:", err);
-      res.status(500).json({ error: "Failed to fetch stats" });
+      res.status(500).json({ error: "Server error" });
     }
   });
 
-  // --- Health Check for Uptime Monitoring ---
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  app.delete("/api/sessions", authenticateToken, async (req: any, res) => {
+    try {
+      const sessions = await getSessions();
+      const filtered = sessions.filter((s: any) => s.userId !== req.user.id);
+      await saveSessions(filtered);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Server error" });
+    }
   });
 
   // --- Vite Middleware ---
