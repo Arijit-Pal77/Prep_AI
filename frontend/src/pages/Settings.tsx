@@ -239,9 +239,9 @@ export default function SettingsPage() {
                <div className="flex items-start gap-4">
                  <Sparkles className="text-accent-primary shrink-0" size={20} />
                  <div>
-                   <h5 className="text-sm font-bold text-text-main mb-2">Live Theme Injection</h5>
+                   <h5 className="text-sm font-bold text-text-main mb-2">◆ Arijit</h5>
                    <p className="text-xs text-text-dim leading-relaxed">
-                     Theme properties are injected into the CSS Object Model in real-time. Changes are persistent across page refreshes and active sessions.
+                     designing logic · crafting systems · evolving self
                    </p>
                  </div>
                </div>
