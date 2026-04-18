@@ -642,6 +642,12 @@ export default function Dashboard() {
                             <textarea 
                               value={answer}
                               onChange={(e) => setAnswer(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && e.shiftKey) {
+                                  e.preventDefault();
+                                  submitInterviewTurn();
+                                }
+                              }}
                               placeholder="Speak your mind here..."
                               className="w-full h-36 bg-black/40 border border-border-dim rounded-xl p-5 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
                             />
