@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   ClipboardCheck, 
   Mic2, 
@@ -31,9 +33,13 @@ import {
   Sparkles,
   Calendar,
   Map as MapIcon,
-  Layers
+  Layers,
+  Clock,
+  Copy,
+  Check
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import ReactMarkdown from 'react-markdown';
 import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn, generateExplanation, generateSyllabusPlan } from "../lib/gemini";
 import { StatCard, PerformanceAreaChart, TopicAnalysisChart } from "../components/StatsComponents";
 
@@ -62,11 +68,13 @@ export default function Dashboard() {
     currentQuestion: string | null;
     history: string[];
     feedback: string | null;
+    elapsedSeconds: number;
   }>({
     running: false,
     currentQuestion: null,
     history: [],
-    feedback: null
+    feedback: null,
+    elapsedSeconds: 0
   });
 
   const [topic, setTopic] = useState("Software Engineering");
@@ -88,6 +96,16 @@ export default function Dashboard() {
       fetchStats();
     }
   }, [mode]);
+
+  useEffect(() => {
+    let interval: any;
+    if (interviewState.running && interviewState.currentQuestion && !loading) {
+      interval = setInterval(() => {
+        setInterviewState(prev => ({ ...prev, elapsedSeconds: prev.elapsedSeconds + 1 }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [interviewState.running, interviewState.currentQuestion, loading]);
 
   const fetchProfile = async () => {
     try {
@@ -197,7 +215,8 @@ export default function Dashboard() {
         running: true,
         currentQuestion: q || "Tell me about yourself.",
         history: [],
-        feedback: null
+        feedback: null,
+        elapsedSeconds: 0
       });
     } catch (err) {
       console.error(err);
@@ -226,7 +245,8 @@ export default function Dashboard() {
         ...prev,
         feedback: feedbackMatch ? feedbackMatch[1].trim() : "Good effort!",
         currentQuestion: nextQMatch ? nextQMatch[1].trim() : "That's all for now.",
-        history: [...prev.history, `Q: ${prev.currentQuestion}`, `A: ${answer}`]
+        history: [...prev.history, `Q: ${prev.currentQuestion}`, `A: ${answer} (Time: ${prev.elapsedSeconds}s)`],
+        elapsedSeconds: 0
       }));
       setAnswer("");
     } catch (err) {
@@ -240,11 +260,50 @@ export default function Dashboard() {
   const [explainerLang, setExplainerLang] = useState<"English" | "Hindi">("English");
   const [explainerMode, setExplainerMode] = useState<"Normal" | "ELI10" | "Exam">("Normal");
   const [explainerResult, setExplainerResult] = useState<string | null>(null);
+  const [explainerFileName, setExplainerFileName] = useState<string | null>(null);
 
   const [syllabusContent, setSyllabusContent] = useState("");
   const [syllabusSubject, setSyllabusSubject] = useState("");
   const [syllabusDate, setSyllabusDate] = useState("");
   const [syllabusResult, setSyllabusResult] = useState<string | null>(null);
+  const [syllabusFileName, setSyllabusFileName] = useState<string | null>(null);
+
+  const explainerRef = useRef<HTMLDivElement>(null);
+  const syllabusRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const exportToPDF = async (elementRef: React.RefObject<HTMLDivElement>, fileName: string) => {
+    if (!elementRef.current) return;
+    setLoading(true);
+    try {
+      const element = elementRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#0a0a0a', // Deep black for PDF contrast
+        logging: false
+      });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${fileName}.pdf`);
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   const handleSyllabusPlan = async () => {
     if (!syllabusContent.trim()) return;
@@ -285,8 +344,8 @@ export default function Dashboard() {
         reader.onload = async () => {
           try {
             const pdfjs = await import("pdfjs-dist");
-            // Set worker source
-            pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+            // Set worker source to unpkg .mjs which is required for v5+
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
             
             const arrayBuffer = reader.result as ArrayBuffer;
             const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
@@ -297,8 +356,13 @@ export default function Dashboard() {
               const pageText = textContent.items.map((item: any) => item.str).join(" ");
               fullText += pageText + "\n";
             }
-            if (target === "explainer") setExplainerContent(fullText);
-            else setSyllabusContent(fullText);
+            if (target === "explainer") {
+              setExplainerContent(fullText);
+              setExplainerFileName(file.name);
+            } else {
+              setSyllabusContent(fullText);
+              setSyllabusFileName(file.name);
+            }
           } catch (err) {
             console.error("PDF extraction error", err);
             alert("Error reading PDF content.");
@@ -313,8 +377,13 @@ export default function Dashboard() {
     } else {
       const reader = new FileReader();
       reader.onload = () => {
-        if (target === "explainer") setExplainerContent(reader.result as string);
-        else setSyllabusContent(reader.result as string);
+        if (target === "explainer") {
+          setExplainerContent(reader.result as string);
+          setExplainerFileName(file.name);
+        } else {
+          setSyllabusContent(reader.result as string);
+          setSyllabusFileName(file.name);
+        }
       };
       reader.readAsText(file);
     }
@@ -332,18 +401,41 @@ export default function Dashboard() {
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="font-micro">Academic Input</label>
-                <textarea 
-                  value={explainerContent}
-                  onChange={(e) => setExplainerContent(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.shiftKey) {
-                      e.preventDefault();
-                      handleExplainer();
-                    }
-                  }}
-                  placeholder="Paste topic, syllabus, or complex text..."
-                  className="w-full h-64 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
-                />
+                {explainerFileName ? (
+                  <div className="w-full h-64 bg-accent-primary/5 border border-accent-primary/30 rounded-lg p-6 flex flex-col items-center justify-center text-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-accent-primary/10 flex items-center justify-center">
+                      <FileText className="text-accent-primary" size={32} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-text-main">
+                        {explainerFileName}
+                      </p>
+                      <p className="font-micro text-emerald-400">Successfully Uploaded</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setExplainerFileName(null);
+                        setExplainerContent("");
+                      }}
+                      className="text-xs text-text-dim hover:text-red-400 transition-all underline underline-offset-4"
+                    >
+                      Remove and type instead
+                    </button>
+                  </div>
+                ) : (
+                  <textarea 
+                    value={explainerContent}
+                    onChange={(e) => setExplainerContent(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.shiftKey) {
+                        e.preventDefault();
+                        handleExplainer();
+                      }
+                    }}
+                    placeholder="Paste topic, syllabus, or complex text..."
+                    className="w-full h-64 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
+                  />
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -360,11 +452,14 @@ export default function Dashboard() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-panel-bg border border-border-dim rounded-xl font-micro hover:bg-white/5 cursor-pointer transition-all"
                   >
                     <Upload size={16} />
-                    {loading ? "Reading..." : "Upload PDF/Text"}
+                    {loading ? "Reading..." : explainerFileName ? "Change File" : "Upload PDF/Text"}
                   </label>
                 </div>
                 <button 
-                  onClick={() => setExplainerContent("")}
+                  onClick={() => {
+                    setExplainerContent("");
+                    setExplainerFileName(null);
+                  }}
                   className="p-3 bg-panel-bg border border-border-dim rounded-xl text-text-dim hover:text-red-400 transition-all"
                 >
                   <Trash2 size={18} />
@@ -420,49 +515,48 @@ export default function Dashboard() {
             <div className="font-micro mb-8 border-b border-border-dim pb-4 flex items-center justify-between">
               <span>Structured Output</span>
               {explainerResult && (
-                <button 
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 text-accent-primary hover:underline"
-                >
-                  <Download size={14} /> Download PDF
-                </button>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => copyToClipboard(explainerResult, 'explainer')}
+                    className="flex items-center gap-2 text-text-dim hover:text-accent-primary transition-all text-[10px] uppercase tracking-wider"
+                  >
+                    {copied === 'explainer' ? <Check size={14} /> : <Copy size={14} />}
+                    {copied === 'explainer' ? "Copied" : "Copy Notes"}
+                  </button>
+                  <button 
+                    onClick={() => exportToPDF(explainerRef, `Explanation-${Date.now()}`)}
+                    className="flex items-center gap-2 text-accent-primary hover:underline font-bold text-[10px] uppercase tracking-wider"
+                  >
+                    <Download size={14} /> {loading ? "Generating..." : "Download PDF"}
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1" ref={explainerRef}>
               {explainerResult ? (
-                <div className="space-y-10">
-                  {explainerResult.split('\n\n').map((block, i) => {
-                    const lines = block.split('\n');
-                    const title = lines[0];
-                    const content = lines.slice(1).join('\n');
-                    
-                    if (title.match(/^\d\./)) {
-                      return (
-                        <motion.div 
-                          key={i}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.1 }}
-                        >
-                          <h4 className="text-xl font-bold font-headline text-accent-primary mb-4">{title}</h4>
-                          <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-3">
-                            {content.split('\n').map((line, li) => (
-                              <p key={li} className="text-sm leading-relaxed text-text-main">
-                                {line.startsWith('-') || line.startsWith('*') ? (
-                                  <span className="flex gap-3">
-                                    <span className="text-accent-secondary mt-1.5">•</span>
-                                    <span>{line.substring(1).trim()}</span>
-                                  </span>
-                                ) : line}
-                              </p>
-                            ))}
-                          </div>
-                        </motion.div>
-                      );
-                    }
-                    return null;
-                  })}
+                <div className="prose prose-invert max-w-none">
+                  <div className="space-y-6">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold font-headline text-accent-primary mb-6" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-bold font-headline text-accent-primary mb-4" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-bold font-headline text-accent-primary mb-3" {...props} />,
+                        h4: ({node, ...props}) => <h4 className="text-md font-bold font-headline text-accent-primary mb-2" {...props} />,
+                        p: ({node, ...props}) => <p className="text-sm leading-relaxed text-text-main mb-4" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-none space-y-3 mb-6" {...props} />,
+                        li: ({node, ...props}) => (
+                          <li className="flex gap-3 text-sm text-text-main">
+                            <span className="text-accent-secondary mt-1.5 shrink-0">•</span>
+                            <span>{props.children}</span>
+                          </li>
+                        ),
+                        strong: ({node, ...props}) => <strong className="text-accent-secondary font-bold" {...props} />,
+                      }}
+                    >
+                      {explainerResult}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-30">
@@ -516,12 +610,35 @@ export default function Dashboard() {
 
               <div className="space-y-2">
                 <label className="font-micro">Syllabus Details (PDF or Text)</label>
-                <textarea 
-                  value={syllabusContent}
-                  onChange={(e) => setSyllabusContent(e.target.value)}
-                  placeholder="Paste syllabus modules or upload PDF..."
-                  className="w-full h-40 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
-                />
+                {syllabusFileName ? (
+                  <div className="w-full h-40 bg-accent-secondary/5 border border-accent-secondary/30 rounded-lg p-4 flex flex-col items-center justify-center text-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-accent-secondary/10 flex items-center justify-center">
+                      <FileText className="text-accent-secondary" size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-text-main line-clamp-1">
+                        {syllabusFileName}
+                      </p>
+                      <p className="text-[10px] font-micro text-emerald-400">Ready to Analyze</p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setSyllabusFileName(null);
+                        setSyllabusContent("");
+                      }}
+                      className="text-[10px] text-text-dim hover:text-red-400 transition-all underline underline-offset-4"
+                    >
+                      Clear File
+                    </button>
+                  </div>
+                ) : (
+                  <textarea 
+                    value={syllabusContent}
+                    onChange={(e) => setSyllabusContent(e.target.value)}
+                    placeholder="Paste syllabus modules or upload PDF..."
+                    className="w-full h-40 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
+                  />
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -538,11 +655,14 @@ export default function Dashboard() {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-panel-bg border border-border-dim rounded-xl font-micro hover:bg-white/5 cursor-pointer transition-all"
                   >
                     <Upload size={16} />
-                    {loading ? "Reading..." : "Upload Syllabus"}
+                    {loading ? "Reading..." : syllabusFileName ? "Change Syllabus" : "Upload Syllabus"}
                   </label>
                 </div>
                 <button 
-                  onClick={() => setSyllabusContent("")}
+                  onClick={() => {
+                    setSyllabusContent("");
+                    setSyllabusFileName(null);
+                  }}
                   className="p-3 bg-panel-bg border border-border-dim rounded-xl text-text-dim hover:text-red-400 transition-all"
                 >
                   <Trash2 size={18} />
@@ -566,54 +686,47 @@ export default function Dashboard() {
             <div className="font-micro mb-8 border-b border-border-dim pb-4 flex items-center justify-between">
               <span>Smart Strategy Guide</span>
               {syllabusResult && (
-                <button 
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 text-accent-secondary hover:underline"
-                >
-                  <Download size={14} /> Save Strategy
-                </button>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => copyToClipboard(syllabusResult, 'syllabus')}
+                    className="flex items-center gap-2 text-text-dim hover:text-accent-secondary transition-all text-[10px] uppercase tracking-wider"
+                  >
+                    {copied === 'syllabus' ? <Check size={14} /> : <Copy size={14} />}
+                    {copied === 'syllabus' ? "Copied" : "Copy Roadmap"}
+                  </button>
+                  <button 
+                    onClick={() => exportToPDF(syllabusRef, `Syllabus-Strategy-${Date.now()}`)}
+                    className="flex items-center gap-2 text-accent-secondary hover:underline font-bold text-[10px] uppercase tracking-wider"
+                  >
+                    <Download size={14} /> {loading ? "Saving..." : "Save Strategy"}
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1" ref={syllabusRef}>
               {syllabusResult ? (
-                <div className="space-y-8">
-                  {syllabusResult.split('\n\n').map((block, i) => {
-                    const lines = block.split('\n');
-                    const title = lines[0];
-                    const content = lines.slice(1).join('\n');
-                    
-                    if (title.match(/^\d\./)) {
-                      return (
-                        <motion.div 
-                          key={i}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: i * 0.1 }}
-                        >
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-accent-secondary/10 flex items-center justify-center text-accent-secondary font-bold">
-                              {title.charAt(0)}
-                            </div>
-                            <h4 className="text-xl font-bold font-headline text-text-main">{title.substring(2)}</h4>
-                          </div>
-                          <div className="bg-black/20 p-6 rounded-2xl border border-border-dim space-y-3">
-                            {content.split('\n').map((line, li) => (
-                              <div key={li} className="text-sm leading-relaxed text-text-main">
-                                {line.startsWith('-') || line.startsWith('*') ? (
-                                  <div className="flex gap-3 mb-2">
-                                    <div className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-secondary shrink-0" />
-                                    <span>{line.substring(1).trim()}</span>
-                                  </div>
-                                ) : line}
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      );
-                    }
-                    return null;
-                  })}
+                <div className="prose prose-invert max-w-none">
+                  <div className="space-y-8">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold font-headline text-text-main mb-8 pb-2 border-b border-white/10" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-bold font-headline text-text-main mb-6 mt-10" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-bold font-headline text-text-main mb-4" {...props} />,
+                        p: ({node, ...props}) => <p className="text-sm leading-relaxed text-text-main mb-4" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-none space-y-3 mb-6" {...props} />,
+                        li: ({node, ...props}) => (
+                          <li className="flex gap-3 text-sm text-text-main glass-card p-4 rounded-xl border-white/5 bg-white/[0.02]">
+                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent-secondary shrink-0" />
+                            <span>{props.children}</span>
+                          </li>
+                        ),
+                        strong: ({node, ...props}) => <strong className="text-accent-secondary font-bold" {...props} />,
+                      }}
+                    >
+                      {syllabusResult}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-30">
@@ -1048,9 +1161,16 @@ export default function Dashboard() {
                           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                           <span className="font-micro text-emerald-400">Live Simulation</span>
                         </div>
-                        <button onClick={() => setInterviewState(s => ({ ...s, running: false }))} className="text-text-dim hover:text-text-main transition-all">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-2 px-3 py-1 bg-black/20 rounded-lg border border-border-dim font-mono text-xs text-accent-primary">
+                            <Clock size={12} />
+                            {Math.floor(interviewState.elapsedSeconds / 60).toString().padStart(2, '0')}:
+                            {(interviewState.elapsedSeconds % 60).toString().padStart(2, '0')}
+                          </div>
+                          <button onClick={() => setInterviewState(s => ({ ...s, running: false }))} className="text-text-dim hover:text-text-main transition-all">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-6">
