@@ -272,25 +272,80 @@ export default function Dashboard() {
   const syllabusRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const exportToPDF = async (elementRef: React.RefObject<HTMLDivElement>, fileName: string) => {
+  const exportToPDF = async (elementRef: React.RefObject<HTMLDivElement>, fileName: string, titleStr: string) => {
     if (!elementRef.current) return;
     setLoading(true);
     try {
       const element = elementRef.current;
-      const canvas = await html2canvas(element, {
+      
+      // Create a temporary container for print-optimized rendering
+      const printContainer = document.createElement('div');
+      printContainer.style.position = 'absolute';
+      printContainer.style.left = '-9999px';
+      printContainer.style.top = '0';
+      printContainer.style.width = '800px'; // Standard A4-ish width
+      printContainer.style.backgroundColor = 'white';
+      printContainer.style.color = 'black';
+      printContainer.style.padding = '40px';
+      printContainer.innerHTML = `
+        <div style="margin-bottom: 20px; border-bottom: 2px solid #21008e; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <h1 style="color: #21008e; margin: 0; font-size: 24px; font-family: sans-serif;">PrepAI Notes</h1>
+            <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">${titleStr}</p>
+          </div>
+          <p style="margin: 0; font-size: 10px; color: #999;">Generated on ${new Date().toLocaleDateString()}</p>
+        </div>
+        <div style="font-family: sans-serif;">
+          ${element.innerHTML}
+        </div>
+        <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; font-size: 9px; color: #aaa; text-align: center;">
+          Empowered by PrepAI - Your Smart Study Companion
+        </div>
+      `;
+      
+      // Fix colors for light background
+      const textElements = printContainer.querySelectorAll('p, span, li, div, h1, h2, h3, h4');
+      textElements.forEach((el: any) => {
+        if (el.style.color === 'rgb(255, 255, 255)' || !el.style.color) {
+          el.style.color = '#1a1a1a';
+        }
+      });
+      
+      document.body.appendChild(printContainer);
+
+      const canvas = await html2canvas(printContainer, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#0a0a0a', // Deep black for PDF contrast
-        logging: false
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 800
       });
+      
+      document.body.removeChild(printContainer);
+      
       const imgData = canvas.toDataURL('image/png');
-      
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = 190; // mm with margins
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 10; // margin top
+
+      // Page 1
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
       console.error('PDF Export Error:', error);
@@ -524,7 +579,7 @@ export default function Dashboard() {
                     {copied === 'explainer' ? "Copied" : "Copy Notes"}
                   </button>
                   <button 
-                    onClick={() => exportToPDF(explainerRef, `Explanation-${Date.now()}`)}
+                    onClick={() => exportToPDF(explainerRef, `Explanation-${Date.now()}`, "AI Explanation & Concept Breakdown")}
                     className="flex items-center gap-2 text-accent-primary hover:underline font-bold text-[10px] uppercase tracking-wider"
                   >
                     <Download size={14} /> {loading ? "Generating..." : "Download PDF"}
@@ -695,7 +750,7 @@ export default function Dashboard() {
                     {copied === 'syllabus' ? "Copied" : "Copy Roadmap"}
                   </button>
                   <button 
-                    onClick={() => exportToPDF(syllabusRef, `Syllabus-Strategy-${Date.now()}`)}
+                    onClick={() => exportToPDF(syllabusRef, `Syllabus-Strategy-${Date.now()}`, syllabusSubject || "Syllabus Strategy Guide")}
                     className="flex items-center gap-2 text-accent-secondary hover:underline font-bold text-[10px] uppercase tracking-wider"
                   >
                     <Download size={14} /> {loading ? "Saving..." : "Save Strategy"}
