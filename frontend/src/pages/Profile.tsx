@@ -24,7 +24,7 @@ export default function Profile() {
       if (res.ok) {
         setUsername(data.username);
         setEmail(data.email);
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         navigate("/auth");

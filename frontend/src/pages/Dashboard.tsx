@@ -117,8 +117,9 @@ export default function Dashboard() {
         const data = await res.json();
         setUser(data);
         localStorage.setItem("user", JSON.stringify(data));
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
         localStorage.removeItem("token");
+        localStorage.removeItem("user");
         navigate("/auth");
       }
     } catch (err) {
