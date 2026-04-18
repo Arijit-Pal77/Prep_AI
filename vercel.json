@@ -1,28 +1,17 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "backend/server.ts",
-      "use": "@vercel/node"
+      "source": "/auth/(.*)",
+      "destination": "/api/server.ts"
     },
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "frontend/dist" }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/auth/(.*)",
-      "dest": "backend/server.ts"
+      "source": "/api/(.*)",
+      "destination": "/api/server.ts"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "backend/server.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/dist/$1"
+      "source": "/(.*)",
+      "destination": "/frontend/dist/$1"
     }
   ]
 }

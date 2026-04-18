@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx backend/server.ts",
+    "dev": "tsx api/server.ts",
     "build": "vite build frontend",
     "preview": "vite preview frontend",
     "clean": "rm -rf frontend/dist",

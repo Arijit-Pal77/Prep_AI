@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import pool from "./db.js";
+import pool from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -203,6 +203,16 @@ if (process.env.NODE_ENV !== "production") {
     });
   });
 }
+
+// Error handling middleware
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global Error Handler Catch:", err);
+  res.status(500).json({ 
+    error: "Internal Server Error", 
+    message: err.message,
+    stack: process.env.NODE_ENV === "production" ? undefined : err.stack
+  });
+});
 
 // Export the app instance for Vercel
 export default app;
