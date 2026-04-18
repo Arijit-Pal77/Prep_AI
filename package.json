@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx api/server.ts",
-    "build": "vite build frontend",
+    "dev": "tsx api/index.ts",
+    "build": "vite build frontend --outDir ../dist",
     "preview": "vite preview frontend",
     "clean": "rm -rf frontend/dist",
     "lint": "tsc --project frontend/tsconfig.json --noEmit"
