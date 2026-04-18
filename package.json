@@ -7,7 +7,7 @@
     "dev": "tsx api/index.ts",
     "build": "vite build frontend --outDir ../dist",
     "preview": "vite preview frontend",
-    "clean": "rm -rf frontend/dist",
+    "clean": "rm -rf dist",
     "lint": "tsc --project frontend/tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "mysql2": "^3.22.1",
+    "pdfjs-dist": "^5.6.205",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.14.1",

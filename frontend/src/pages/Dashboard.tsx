@@ -22,13 +22,19 @@ import {
   LineChart,
   BarChart as BarChartIcon,
   Activity,
-  Award
+  Award,
+  FileText,
+  BookOpen,
+  Upload,
+  Languages,
+  Download,
+  Sparkles
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn } from "../lib/gemini";
+import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn, generateExplanation } from "../lib/gemini";
 import { StatCard, PerformanceAreaChart, TopicAnalysisChart } from "../components/StatsComponents";
 
-type Mode = "evaluate" | "interview" | "analytics";
+type Mode = "evaluate" | "interview" | "analytics" | "explainer";
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -40,8 +46,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     const urlMode = searchParams.get("mode");
-    if (urlMode === "evaluate" || urlMode === "interview" || urlMode === "analytics") {
-      setMode(urlMode);
+    if (urlMode === "evaluate" || urlMode === "interview" || urlMode === "analytics" || urlMode === "explainer") {
+      setMode(urlMode as Mode);
     }
   }, [searchParams]);
 
@@ -227,6 +233,227 @@ export default function Dashboard() {
     }
   };
 
+  const [explainerContent, setExplainerContent] = useState("");
+  const [explainerLang, setExplainerLang] = useState<"English" | "Hindi">("English");
+  const [explainerMode, setExplainerMode] = useState<"Normal" | "ELI10" | "Exam">("Normal");
+  const [explainerResult, setExplainerResult] = useState<string | null>(null);
+
+  const handleExplainer = async () => {
+    if (!explainerContent.trim()) return;
+    setLoading(true);
+    try {
+      const resp = await generateExplanation(explainerContent, explainerLang, explainerMode);
+      setExplainerResult(resp || "No analysis found");
+    } catch (err) {
+      console.error(err);
+      setExplainerResult("Error generating explanation. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === "application/pdf") {
+      setLoading(true);
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const pdfjs = await import("pdfjs-dist");
+            // Set worker source
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+            
+            const arrayBuffer = reader.result as ArrayBuffer;
+            const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+            let fullText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map((item: any) => item.str).join(" ");
+              fullText += pageText + "\n";
+            }
+            setExplainerContent(fullText);
+          } catch (err) {
+            console.error("PDF extraction error", err);
+            alert("Error reading PDF content.");
+          } finally {
+            setLoading(false);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        setLoading(false);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => setExplainerContent(reader.result as string);
+      reader.readAsText(file);
+    }
+  };
+
+  const renderExplainer = () => {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="glass-card p-6">
+            <h3 className="text-xl font-bold font-headline mb-4 flex items-center gap-2">
+              <BookOpen className="text-accent-primary" size={20} />
+              Study Content
+            </h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="font-micro">Academic Input</label>
+                <textarea 
+                  value={explainerContent}
+                  onChange={(e) => setExplainerContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault();
+                      handleExplainer();
+                    }
+                  }}
+                  placeholder="Paste topic, syllabus, or complex text..."
+                  className="w-full h-64 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <input 
+                    type="file" 
+                    id="pdf-upload" 
+                    className="hidden" 
+                    accept=".pdf,.txt" 
+                    onChange={handleFileChange}
+                  />
+                  <label 
+                    htmlFor="pdf-upload" 
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-panel-bg border border-border-dim rounded-xl font-micro hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <Upload size={16} />
+                    {loading ? "Reading..." : "Upload PDF/Text"}
+                  </label>
+                </div>
+                <button 
+                  onClick={() => setExplainerContent("")}
+                  className="p-3 bg-panel-bg border border-border-dim rounded-xl text-text-dim hover:text-red-400 transition-all"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="font-micro">Language</label>
+                  <div className="flex bg-black/20 p-1 rounded-lg border border-border-dim">
+                    <button 
+                      onClick={() => setExplainerLang("English")}
+                      className={`flex-1 py-2 rounded-md font-micro text-[10px] transition-all ${explainerLang === "English" ? "bg-accent-primary text-black" : "text-text-dim"}`}
+                    >
+                      ENG
+                    </button>
+                    <button 
+                      onClick={() => setExplainerLang("Hindi")}
+                      className={`flex-1 py-2 rounded-md font-micro text-[10px] transition-all ${explainerLang === "Hindi" ? "bg-accent-primary text-black" : "text-text-dim"}`}
+                    >
+                      HIN
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="font-micro">Strictness</label>
+                  <select 
+                    value={explainerMode}
+                    onChange={(e) => setExplainerMode(e.target.value as any)}
+                    className="w-full bg-black/20 border border-border-dim rounded-lg px-3 py-2 text-xs focus:border-accent-primary outline-none"
+                  >
+                    <option value="Normal">Balanced</option>
+                    <option value="ELI10">Simple (10yo)</option>
+                    <option value="Exam">Exam Mode</option>
+                  </select>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleExplainer}
+                disabled={loading || !explainerContent.trim()}
+                className="btn-minimal w-full py-4 flex items-center justify-center gap-3 font-micro"
+              >
+                {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <Sparkles size={18} />}
+                Generate Explanation
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="glass-card p-10 min-h-[600px] flex flex-col relative overflow-hidden">
+            <div className="font-micro mb-8 border-b border-border-dim pb-4 flex items-center justify-between">
+              <span>Structured Output</span>
+              {explainerResult && (
+                <button 
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 text-accent-primary hover:underline"
+                >
+                  <Download size={14} /> Download PDF
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1">
+              {explainerResult ? (
+                <div className="space-y-10">
+                  {explainerResult.split('\n\n').map((block, i) => {
+                    const lines = block.split('\n');
+                    const title = lines[0];
+                    const content = lines.slice(1).join('\n');
+                    
+                    if (title.match(/^\d\./)) {
+                      return (
+                        <motion.div 
+                          key={i}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1 }}
+                        >
+                          <h4 className="text-xl font-bold font-headline text-accent-primary mb-4">{title}</h4>
+                          <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-3">
+                            {content.split('\n').map((line, li) => (
+                              <p key={li} className="text-sm leading-relaxed text-text-main">
+                                {line.startsWith('-') || line.startsWith('*') ? (
+                                  <span className="flex gap-3">
+                                    <span className="text-accent-secondary mt-1.5">•</span>
+                                    <span>{line.substring(1).trim()}</span>
+                                  </span>
+                                ) : line}
+                              </p>
+                            ))}
+                          </div>
+                        </motion.div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-30">
+                  <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                    <FileText size={40} className="text-text-dim" />
+                  </div>
+                  <h3 className="text-xl font-bold font-headline mb-2">Ready to Explain</h3>
+                  <p className="font-micro max-w-xs mx-auto">Upload a PDF or paste text to generate structured, exam-ready notes.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderAnalytics = () => {
     if (statsLoading && !stats) {
       return (
@@ -338,7 +565,7 @@ export default function Dashboard() {
           <NavItem 
             icon={<LayoutDashboard size={18}/>} 
             label="Dashboard" 
-            active={mode === "evaluate" || mode === "interview" || mode === "analytics"}
+            active={mode === "evaluate" || mode === "interview" || mode === "analytics" || mode === "explainer"}
           />
           <NavItem 
             icon={<User size={18}/>} 
@@ -390,7 +617,7 @@ export default function Dashboard() {
               <Menu size={24} />
             </button>
             <h2 className="font-micro">
-              {mode === "evaluate" ? "Answer Evaluator" : mode === "interview" ? "Interview Sim" : "Performance Analytics"}
+              {mode === "evaluate" ? "Answer Evaluator" : mode === "interview" ? "Interview Sim" : mode === "explainer" ? "AI Explainer" : "Performance Analytics"}
             </h2>
             
             <div className="h-6 w-[1.5px] bg-border-dim hidden md:block"></div>
@@ -413,6 +640,12 @@ export default function Dashboard() {
                 className={`px-6 py-2 rounded-lg font-micro transition-all ${mode === "analytics" ? 'bg-accent-primary/10 text-accent-primary border border-accent-primary/20' : 'text-text-dim hover:text-text-main'}`}
               >
                 Analytics
+              </button>
+              <button 
+                onClick={() => { setMode("explainer"); setExplainerResult(null); }}
+                className={`px-6 py-2 rounded-lg font-micro transition-all ${mode === "explainer" ? 'bg-accent-primary/10 text-accent-primary border border-accent-primary/20' : 'text-text-dim hover:text-text-main'}`}
+              >
+                Explainer
               </button>
             </div>
           </div>
@@ -438,6 +671,15 @@ export default function Dashboard() {
                >
                  {renderAnalytics()}
                </motion.div>
+            ) : mode === "explainer" ? (
+              <motion.div 
+                key="explainer"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+              >
+                {renderExplainer()}
+              </motion.div>
             ) : mode === "evaluate" ? (
               <motion.div 
                 key="evaluate"
@@ -464,6 +706,12 @@ export default function Dashboard() {
                       <textarea 
                         value={answer}
                         onChange={(e) => setAnswer(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.shiftKey) {
+                            e.preventDefault();
+                            handleEvaluate();
+                          }
+                        }}
                         placeholder="e.g. 'I am a highly motivated developer with a passion for problem-solving...'"
                         className="w-full h-48 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 focus:ring-1 focus:ring-accent-primary/20 transition-all resize-none text-text-main"
                       />

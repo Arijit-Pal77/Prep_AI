@@ -75,3 +75,42 @@ export async function evaluateInterviewTurn(answer: string, question: string) {
 
   return response.text;
 }
+
+export async function generateExplanation(content: string, language: "English" | "Hindi" = "English", mode: "Normal" | "ELI10" | "Exam" = "Normal") {
+  const model = "gemini-3-flash-preview";
+  
+  const modeInstruction = mode === "ELI10" 
+    ? "Explain like I'm 10 years old (ELI5/ELI10 style), using very simple metaphors and no complex jargon." 
+    : mode === "Exam" 
+    ? "Focus strictly on exam-ready points, definitions, and technical accuracy." 
+    : "Provide a balanced, clear academic explanation.";
+
+  const prompt = `
+    You are an expert teacher who explains academic topics in the simplest possible way.
+    Language: ${language}
+    Mode: ${modeInstruction}
+
+    Rules:
+    - Always explain in simple language
+    - Avoid jargon unless necessary (explain it if used)
+    - Use relatable examples
+    - Structure output strictly using the following headings:
+
+    1. Simple Explanation
+    2. Key Concepts (bullet points)
+    3. Real-life Examples
+    4. Important Points for Exams
+    5. Short Summary
+
+    Content/Topic to explain: "${content}"
+
+    If the language is Hindi, translate everything clearly into Hindi.
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+  });
+
+  return response.text;
+}

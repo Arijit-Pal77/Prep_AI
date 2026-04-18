@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Sparkles,
   LayoutDashboard,
-  ShieldCheck
+  ShieldCheck,
+  BookOpen
 } from "lucide-react";
 
 export default function Welcome() {
@@ -59,6 +60,14 @@ export default function Welcome() {
       icon: <Activity className="w-8 h-8 text-emerald-400" />,
       path: "/dashboard?mode=analytics",
       color: "from-emerald-400/20"
+    },
+    {
+      id: "explainer",
+      title: "AI Explainer",
+      description: "Convert any academic topic or PDF into simple, structured notes and exam-ready summaries.",
+      icon: <BookOpen className="w-8 h-8 text-amber-400" />,
+      path: "/dashboard?mode=explainer",
+      color: "from-amber-400/20"
     },
     {
       id: "profile",
@@ -126,7 +135,7 @@ export default function Welcome() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
         >
           {features.map((feature) => (
             <motion.div 
