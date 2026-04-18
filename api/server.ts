@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
@@ -190,18 +189,25 @@ app.delete("/api/sessions", authenticateToken, async (req: any, res) => {
 
 // --- Development/Local Logic ---
 if (process.env.NODE_ENV !== "production") {
-  // Vite Middleware for development
-  createViteServer({
-    root: "frontend",
-    server: { middlewareMode: true },
-    appType: "spa",
-  }).then(vite => {
-    app.use(vite.middlewares);
-    const PORT = 3000;
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Prep AI Development Server running at http://localhost:${PORT}`);
-    });
-  });
+  // Use dynamic import for Vite so it's not bundled in production serverless functions
+  const startDevServer = async () => {
+    try {
+      const { createServer } = await import("vite");
+      const vite = await createServer({
+        root: "frontend",
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      const PORT = 3000;
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Prep AI Development Server running at http://localhost:${PORT}`);
+      });
+    } catch (err) {
+      console.error("Failed to load Vite in development:", err);
+    }
+  };
+  startDevServer();
 }
 
 // Error handling middleware
