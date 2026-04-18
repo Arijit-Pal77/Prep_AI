@@ -28,13 +28,16 @@ import {
   Upload,
   Languages,
   Download,
-  Sparkles
+  Sparkles,
+  Calendar,
+  Map as MapIcon,
+  Layers
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn, generateExplanation } from "../lib/gemini";
+import { evaluateAnswer, getInterviewQuestion, evaluateInterviewTurn, generateExplanation, generateSyllabusPlan } from "../lib/gemini";
 import { StatCard, PerformanceAreaChart, TopicAnalysisChart } from "../components/StatsComponents";
 
-type Mode = "evaluate" | "interview" | "analytics" | "explainer";
+type Mode = "evaluate" | "interview" | "analytics" | "explainer" | "syllabus";
 
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
@@ -46,7 +49,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const urlMode = searchParams.get("mode");
-    if (urlMode === "evaluate" || urlMode === "interview" || urlMode === "analytics" || urlMode === "explainer") {
+    if (urlMode === "evaluate" || urlMode === "interview" || urlMode === "analytics" || urlMode === "explainer" || urlMode === "syllabus") {
       setMode(urlMode as Mode);
     }
   }, [searchParams]);
@@ -238,6 +241,25 @@ export default function Dashboard() {
   const [explainerMode, setExplainerMode] = useState<"Normal" | "ELI10" | "Exam">("Normal");
   const [explainerResult, setExplainerResult] = useState<string | null>(null);
 
+  const [syllabusContent, setSyllabusContent] = useState("");
+  const [syllabusSubject, setSyllabusSubject] = useState("");
+  const [syllabusDate, setSyllabusDate] = useState("");
+  const [syllabusResult, setSyllabusResult] = useState<string | null>(null);
+
+  const handleSyllabusPlan = async () => {
+    if (!syllabusContent.trim()) return;
+    setLoading(true);
+    try {
+      const resp = await generateSyllabusPlan(syllabusContent, syllabusSubject, syllabusDate);
+      setSyllabusResult(resp || "No plan generated");
+    } catch (err) {
+      console.error(err);
+      setSyllabusResult("Error generating plan. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExplainer = async () => {
     if (!explainerContent.trim()) return;
     setLoading(true);
@@ -252,7 +274,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: "explainer" | "syllabus") => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -275,7 +297,8 @@ export default function Dashboard() {
               const pageText = textContent.items.map((item: any) => item.str).join(" ");
               fullText += pageText + "\n";
             }
-            setExplainerContent(fullText);
+            if (target === "explainer") setExplainerContent(fullText);
+            else setSyllabusContent(fullText);
           } catch (err) {
             console.error("PDF extraction error", err);
             alert("Error reading PDF content.");
@@ -289,7 +312,10 @@ export default function Dashboard() {
       }
     } else {
       const reader = new FileReader();
-      reader.onload = () => setExplainerContent(reader.result as string);
+      reader.onload = () => {
+        if (target === "explainer") setExplainerContent(reader.result as string);
+        else setSyllabusContent(reader.result as string);
+      };
       reader.readAsText(file);
     }
   };
@@ -327,7 +353,7 @@ export default function Dashboard() {
                     id="pdf-upload" 
                     className="hidden" 
                     accept=".pdf,.txt" 
-                    onChange={handleFileChange}
+                    onChange={(e) => handleFileChange(e, "explainer")}
                   />
                   <label 
                     htmlFor="pdf-upload" 
@@ -454,6 +480,157 @@ export default function Dashboard() {
     );
   };
 
+  const renderSyllabusNavigator = () => {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="glass-card p-6">
+            <h3 className="text-xl font-bold font-headline mb-4 flex items-center gap-2">
+              <Layers className="text-accent-secondary" size={20} />
+              Syllabus Engine
+            </h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="font-micro">Subject Name</label>
+                <input 
+                  type="text"
+                  value={syllabusSubject}
+                  onChange={(e) => setSyllabusSubject(e.target.value)}
+                  placeholder="e.g. Computer Networks"
+                  className="w-full bg-black/20 border border-border-dim rounded-lg px-4 py-3 text-sm focus:border-accent-primary outline-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-micro">Exam Date (Optional)</label>
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-text-dim" size={16} />
+                  <input 
+                    type="date"
+                    value={syllabusDate}
+                    onChange={(e) => setSyllabusDate(e.target.value)}
+                    className="w-full bg-black/20 border border-border-dim rounded-lg pl-12 pr-4 py-3 text-sm focus:border-accent-primary outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-micro">Syllabus Details (PDF or Text)</label>
+                <textarea 
+                  value={syllabusContent}
+                  onChange={(e) => setSyllabusContent(e.target.value)}
+                  placeholder="Paste syllabus modules or upload PDF..."
+                  className="w-full h-40 bg-black/20 border border-border-dim rounded-lg p-4 text-sm leading-relaxed outline-none focus:border-accent-primary/40 transition-all resize-none text-text-main"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <input 
+                    type="file" 
+                    id="syllabus-upload" 
+                    className="hidden" 
+                    accept=".pdf,.txt" 
+                    onChange={(e) => handleFileChange(e, "syllabus")}
+                  />
+                  <label 
+                    htmlFor="syllabus-upload" 
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-panel-bg border border-border-dim rounded-xl font-micro hover:bg-white/5 cursor-pointer transition-all"
+                  >
+                    <Upload size={16} />
+                    {loading ? "Reading..." : "Upload Syllabus"}
+                  </label>
+                </div>
+                <button 
+                  onClick={() => setSyllabusContent("")}
+                  className="p-3 bg-panel-bg border border-border-dim rounded-xl text-text-dim hover:text-red-400 transition-all"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+
+              <button 
+                onClick={handleSyllabusPlan}
+                disabled={loading || !syllabusContent.trim()}
+                className="btn-minimal w-full py-4 flex items-center justify-center gap-3 font-micro"
+              >
+                {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <MapIcon size={18} />}
+                Build Exam Strategy
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="glass-card p-10 min-h-[600px] flex flex-col relative overflow-hidden bg-gradient-to-br from-accent-secondary/5 to-transparent">
+            <div className="font-micro mb-8 border-b border-border-dim pb-4 flex items-center justify-between">
+              <span>Smart Strategy Guide</span>
+              {syllabusResult && (
+                <button 
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 text-accent-secondary hover:underline"
+                >
+                  <Download size={14} /> Save Strategy
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1">
+              {syllabusResult ? (
+                <div className="space-y-8">
+                  {syllabusResult.split('\n\n').map((block, i) => {
+                    const lines = block.split('\n');
+                    const title = lines[0];
+                    const content = lines.slice(1).join('\n');
+                    
+                    if (title.match(/^\d\./)) {
+                      return (
+                        <motion.div 
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.1 }}
+                        >
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-accent-secondary/10 flex items-center justify-center text-accent-secondary font-bold">
+                              {title.charAt(0)}
+                            </div>
+                            <h4 className="text-xl font-bold font-headline text-text-main">{title.substring(2)}</h4>
+                          </div>
+                          <div className="bg-black/20 p-6 rounded-2xl border border-border-dim space-y-3">
+                            {content.split('\n').map((line, li) => (
+                              <div key={li} className="text-sm leading-relaxed text-text-main">
+                                {line.startsWith('-') || line.startsWith('*') ? (
+                                  <div className="flex gap-3 mb-2">
+                                    <div className="mt-2 w-1.5 h-1.5 rounded-full bg-accent-secondary shrink-0" />
+                                    <span>{line.substring(1).trim()}</span>
+                                  </div>
+                                ) : line}
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-30">
+                  <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                    <MapIcon size={40} className="text-text-dim" />
+                  </div>
+                  <h3 className="text-xl font-bold font-headline mb-2">Build Your Roadmap</h3>
+                  <p className="font-micro max-w-xs mx-auto">Upload your exam syllabus to receive a ranked topic list, study plan, and revision strategy.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderAnalytics = () => {
     if (statsLoading && !stats) {
       return (
@@ -565,7 +742,7 @@ export default function Dashboard() {
           <NavItem 
             icon={<LayoutDashboard size={18}/>} 
             label="Dashboard" 
-            active={mode === "evaluate" || mode === "interview" || mode === "analytics" || mode === "explainer"}
+            active={mode === "evaluate" || mode === "interview" || mode === "analytics" || mode === "explainer" || mode === "syllabus"}
           />
           <NavItem 
             icon={<User size={18}/>} 
@@ -617,7 +794,7 @@ export default function Dashboard() {
               <Menu size={24} />
             </button>
             <h2 className="font-micro">
-              {mode === "evaluate" ? "Answer Evaluator" : mode === "interview" ? "Interview Sim" : mode === "explainer" ? "AI Explainer" : "Performance Analytics"}
+              {mode === "evaluate" ? "Answer Evaluator" : mode === "interview" ? "Interview Sim" : mode === "explainer" ? "AI Explainer" : mode === "syllabus" ? "Syllabus Navigator" : "Performance Analytics"}
             </h2>
             
             <div className="h-6 w-[1.5px] bg-border-dim hidden md:block"></div>
@@ -646,6 +823,12 @@ export default function Dashboard() {
                 className={`px-6 py-2 rounded-lg font-micro transition-all ${mode === "explainer" ? 'bg-accent-primary/10 text-accent-primary border border-accent-primary/20' : 'text-text-dim hover:text-text-main'}`}
               >
                 Explainer
+              </button>
+              <button 
+                onClick={() => { setMode("syllabus"); setSyllabusResult(null); }}
+                className={`px-6 py-2 rounded-lg font-micro transition-all ${mode === "syllabus" ? 'bg-accent-primary/10 text-accent-primary border border-accent-primary/20' : 'text-text-dim hover:text-text-main'}`}
+              >
+                Syllabus
               </button>
             </div>
           </div>
@@ -679,6 +862,15 @@ export default function Dashboard() {
                 exit={{ opacity: 0, scale: 0.98 }}
               >
                 {renderExplainer()}
+              </motion.div>
+            ) : mode === "syllabus" ? (
+              <motion.div 
+                key="syllabus"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+              >
+                {renderSyllabusNavigator()}
               </motion.div>
             ) : mode === "evaluate" ? (
               <motion.div 

@@ -12,7 +12,9 @@ import {
   Sparkles,
   LayoutDashboard,
   ShieldCheck,
-  BookOpen
+  BookOpen,
+  Map as MapIcon,
+  Layers
 } from "lucide-react";
 
 export default function Welcome() {
@@ -68,6 +70,14 @@ export default function Welcome() {
       icon: <BookOpen className="w-8 h-8 text-amber-400" />,
       path: "/dashboard?mode=explainer",
       color: "from-amber-400/20"
+    },
+    {
+      id: "syllabus",
+      title: "Syllabus Navigator",
+      description: "Turn your syllabus into a complete study roadmap, ranked topics, and exam strategy.",
+      icon: <Layers className="w-8 h-8 text-accent-secondary" />,
+      path: "/dashboard?mode=syllabus",
+      color: "from-accent-secondary/20"
     },
     {
       id: "profile",
@@ -135,7 +145,7 @@ export default function Welcome() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
         >
           {features.map((feature) => (
             <motion.div 

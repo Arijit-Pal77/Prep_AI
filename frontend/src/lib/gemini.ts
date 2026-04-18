@@ -114,3 +114,38 @@ export async function generateExplanation(content: string, language: "English" |
 
   return response.text;
 }
+
+export async function generateSyllabusPlan(syllabus: string, subject?: string, examDate?: string) {
+  const model = "gemini-3-flash-preview";
+  const prompt = `
+    You are an expert academic planner and exam strategist.
+    Subject: ${subject || "Unknown Subject"}
+    ${examDate ? `Exam Date: ${examDate}` : ""}
+
+    Your job is to analyze the following syllabus and convert it into a structured, highly actionable exam preparation guide.
+
+    Rules:
+    - Be structured and clear.
+    - Focus on exam-oriented preparation.
+    - Use bullet points.
+    - If an exam date is given, optimize the timeline accordingly to finish everything before that date.
+
+    Output Structure (MUST USE THESE HEADINGS EXACTLY):
+    
+    1. Subject Overview
+    2. Important Topics (Ranked)
+    3. Study Plan
+    4. PYQ Predictions (Likely Questions)
+    5. Revision Strategy
+
+    Syllabus Content:
+    "${syllabus}"
+  `;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+  });
+
+  return response.text;
+}
