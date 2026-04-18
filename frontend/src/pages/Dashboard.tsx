@@ -268,89 +268,147 @@ export default function Dashboard() {
   const [syllabusResult, setSyllabusResult] = useState<string | null>(null);
   const [syllabusFileName, setSyllabusFileName] = useState<string | null>(null);
 
+  const [downloadState, setDownloadState] = useState<{
+    active: boolean;
+    progress: number;
+    message: string;
+  }>({
+    active: false,
+    progress: 0,
+    message: ""
+  });
+
   const explainerRef = useRef<HTMLDivElement>(null);
   const syllabusRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const exportToPDF = async (elementRef: React.RefObject<HTMLDivElement>, fileName: string, titleStr: string) => {
     if (!elementRef.current) return;
-    setLoading(true);
+    
+    setDownloadState({ active: true, progress: 10, message: "Preparing document structure..." });
+    
     try {
       const element = elementRef.current;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // --- 1. COVER PAGE ---
+      setDownloadState(prev => ({ ...prev, progress: 25, message: "Generating premium cover page..." }));
       
-      // Create a temporary container for print-optimized rendering
-      const printContainer = document.createElement('div');
-      printContainer.style.position = 'absolute';
-      printContainer.style.left = '-9999px';
-      printContainer.style.top = '0';
-      printContainer.style.width = '800px'; // Standard A4-ish width
-      printContainer.style.backgroundColor = 'white';
-      printContainer.style.color = 'black';
-      printContainer.style.padding = '40px';
-      printContainer.innerHTML = `
-        <div style="margin-bottom: 20px; border-bottom: 2px solid #21008e; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end;">
+      const coverContainer = document.createElement('div');
+      coverContainer.style.cssText = `
+        position: absolute; left: -9999px; width: 800px; height: 1131px; 
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+        color: white; padding: 100px 60px; display: flex; flex-direction: column; justify-content: space-between;
+        font-family: sans-serif;
+      `;
+      
+      coverContainer.innerHTML = `
+        <div style="border-left: 4px solid #b18fff; padding-left: 30px;">
+          <h1 style="font-size: 64px; margin: 0; color: #b18fff; letter-spacing: -2px;">PrepAI</h1>
+          <p style="font-size: 20px; text-transform: uppercase; letter-spacing: 4px; opacity: 0.6; margin: 10px 0 0 0;">Smart Study Report</p>
+        </div>
+        
+        <div>
+          <h2 style="font-size: 42px; line-height: 1.2; margin-bottom: 20px;">${titleStr}</h2>
+          <div style="width: 100px; height: 4px; background: #b18fff; margin-bottom: 40px;"></div>
+          <p style="font-size: 18px; opacity: 0.8;">Report ID: #${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+          <p style="font-size: 18px; opacity: 0.8;">Generated for: ${user?.username || "Premium Scholar"}</p>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); pt: 40px;">
           <div>
-            <h1 style="color: #21008e; margin: 0; font-size: 24px; font-family: sans-serif;">PrepAI Notes</h1>
-            <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">${titleStr}</p>
+            <p style="font-size: 14px; opacity: 0.5;">Date generated</p>
+            <p style="font-size: 18px; font-weight: bold;">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
           </div>
-          <p style="margin: 0; font-size: 10px; color: #999;">Generated on ${new Date().toLocaleDateString()}</p>
-        </div>
-        <div style="font-family: sans-serif;">
-          ${element.innerHTML}
-        </div>
-        <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; font-size: 9px; color: #aaa; text-align: center;">
-          Empowered by PrepAI - Your Smart Study Companion
+          <div style="text-align: right;">
+            <p style="font-size: 12px; opacity: 0.4;">© 2026 PrepAI Academic Systems</p>
+          </div>
         </div>
       `;
       
-      // Fix colors for light background
-      const textElements = printContainer.querySelectorAll('p, span, li, div, h1, h2, h3, h4');
-      textElements.forEach((el: any) => {
-        if (el.style.color === 'rgb(255, 255, 255)' || !el.style.color) {
-          el.style.color = '#1a1a1a';
-        }
-      });
+      document.body.appendChild(coverContainer);
+      const coverCanvas = await html2canvas(coverContainer, { scale: 2 });
+      document.body.removeChild(coverContainer);
       
-      document.body.appendChild(printContainer);
+      pdf.addImage(coverCanvas.toDataURL('image/jpeg', 0.8), 'JPEG', 0, 0, pageWidth, pageHeight);
+      
+      // --- 2. CONTENT PAGES ---
+      setDownloadState(prev => ({ ...prev, progress: 50, message: "Capturing structured content..." }));
+      
+      const printContainer = document.createElement('div');
+      printContainer.style.cssText = `
+        position: absolute; left: -9999px; top: 0; width: 800px; 
+        background: white; color: black; padding: 60px 50px;
+        font-family: sans-serif;
+      `;
+      
+      printContainer.innerHTML = `
+        <div style="margin-bottom: 40px; border-bottom: 1px solid #ddd; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: bold; color: #6366f1;">PrepAI Academic Archive</span>
+          <span style="font-size: 12px; color: #999;">${titleStr}</span>
+        </div>
+        <div class="content-body" style="line-height: 1.6;">
+          ${element.innerHTML}
+        </div>
+      `;
 
-      const canvas = await html2canvas(printContainer, {
+      // Apply consistent styling to print output
+      const styles = printContainer.querySelectorAll('h1, h2, h3, h4, p, li, strong');
+      styles.forEach((el: any) => {
+        el.style.color = '#1f2937';
+        if (el.tagName.startsWith('H')) el.style.color = '#111827';
+        if (el.tagName === 'STRONG') el.style.color = '#4f46e5';
+      });
+
+      document.body.appendChild(printContainer);
+      const contentCanvas = await html2canvas(printContainer, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
-        logging: false,
         windowWidth: 800
       });
-      
       document.body.removeChild(printContainer);
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = 190; // mm with margins
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      setDownloadState(prev => ({ ...prev, progress: 80, message: "Building final PDF strategy..." }));
+
+      const imgData = contentCanvas.toDataURL('image/jpeg', 0.85);
+      const imgWidth = 190;
+      const imgHeight = (contentCanvas.height * imgWidth) / contentCanvas.width;
       
       let heightLeft = imgHeight;
-      let position = 10; // margin top
+      let position = 15;
 
-      // Page 1
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - 30);
 
-      // Additional pages if needed
+      let pNum = 2;
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+        position = (heightLeft - imgHeight) + 15;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+        
+        // Add footer with page number
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.text(`Page ${pNum} | Generated for ${user?.username || "Scholar"}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        
+        heightLeft -= (pageHeight - 30);
+        pNum++;
       }
+
+      setDownloadState(prev => ({ ...prev, progress: 100, message: "Document ready!" }));
       
-      pdf.save(`${fileName}.pdf`);
+      setTimeout(() => {
+        pdf.save(`${fileName}.pdf`);
+        setDownloadState({ active: false, progress: 0, message: "" });
+      }, 800);
+
     } catch (error) {
       console.error('PDF Export Error:', error);
-    } finally {
-      setLoading(false);
+      setDownloadState({ active: false, progress: 0, message: "" });
     }
   };
 
@@ -580,9 +638,10 @@ export default function Dashboard() {
                   </button>
                   <button 
                     onClick={() => exportToPDF(explainerRef, `Explanation-${Date.now()}`, "AI Explanation & Concept Breakdown")}
-                    className="flex items-center gap-2 text-accent-primary hover:underline font-bold text-[10px] uppercase tracking-wider"
+                    disabled={downloadState.active}
+                    className={`flex items-center gap-2 text-accent-primary hover:underline font-bold text-[10px] uppercase tracking-wider transition-all ${downloadState.active ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <Download size={14} /> {loading ? "Generating..." : "Download PDF"}
+                    <Download size={14} /> Download PDF
                   </button>
                 </div>
               )}
@@ -751,9 +810,10 @@ export default function Dashboard() {
                   </button>
                   <button 
                     onClick={() => exportToPDF(syllabusRef, `Syllabus-Strategy-${Date.now()}`, syllabusSubject || "Syllabus Strategy Guide")}
-                    className="flex items-center gap-2 text-accent-secondary hover:underline font-bold text-[10px] uppercase tracking-wider"
+                    disabled={downloadState.active}
+                    className={`flex items-center gap-2 text-accent-secondary hover:underline font-bold text-[10px] uppercase tracking-wider transition-all ${downloadState.active ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <Download size={14} /> {loading ? "Saving..." : "Save Strategy"}
+                    <Download size={14} /> Save Strategy
                   </button>
                 </div>
               )}
@@ -878,7 +938,67 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-dark text-text-main font-sans flex overflow-hidden lg:overflow-visible">
+    <div className="min-h-screen bg-bg-dark text-text-main font-sans flex overflow-hidden lg:overflow-visible selection:bg-accent-primary/30">
+      <AnimatePresence>
+        {downloadState.active && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl"
+          >
+            <div className="w-full max-w-md p-10 text-center space-y-8">
+              <div className="relative w-32 h-32 mx-auto">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="60"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="transparent"
+                    className="text-white/10"
+                  />
+                  <motion.circle
+                    cx="64"
+                    cy="64"
+                    r="60"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="transparent"
+                    strokeDasharray="377"
+                    initial={{ strokeDashoffset: 377 }}
+                    animate={{ strokeDashoffset: 377 - (377 * downloadState.progress) / 100 }}
+                    transition={{ type: "spring", stiffness: 50, damping: 15 }}
+                    className="text-accent-primary"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-3xl font-bold font-micro">{downloadState.progress}%</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold font-headline">Generating Premium Report</h3>
+                <p className="text-text-dim font-micro text-sm animate-pulse">
+                  {downloadState.message}
+                </p>
+              </div>
+              <div className="flex justify-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <motion.div 
+                    key={i}
+                    animate={{ scaleY: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.1 }}
+                    className="w-1 h-3 bg-accent-primary rounded-full"
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
